@@ -1,8 +1,8 @@
 import argparse
 
-from piwise import network, dataset, trainer
+from piwise import network, dataset
 
-from torch import nn, optim
+from torch import nn, optim, autograd
 from torch.utils import data
 from torchvision import transforms
 
@@ -12,9 +12,7 @@ def main(args):
     if args.cuda:
         model.cuda()
 
-    criterion = network.CrossEntropySoftmax2d()
-
-    dataloader = data.DataLoader(dataset.VOC2012(args.dataroot,
+    loader = data.DataLoader(dataset.VOC2012(args.dataroot,
         input_transform=transforms.Compose([
             transforms.CenterCrop(256),
             transforms.ToTensor(),
@@ -25,7 +23,31 @@ def main(args):
             transforms.Lambda(lambda t: t.mul(255).long()[0]),
         ])), shuffle=True, num_workers=args.num_workers)
 
-    trainer.Trainer(model, criterion, dataloader).run(args.num_epochs)
+    optimizer = optim.Adam(model.parameters())
+    criterion = network.CrossEntropySoftmax2d()
+
+    for epoch in range(args.num_epochs+1):
+        epoch_loss = 0
+
+        for step, (images, labels) in enumerate(loader):
+            if args.cuda:
+                images = images.cuda()
+                labels = labels.cuda()
+            inputs = autograd.Variable(images)
+            targets = autograd.Variable(labels)
+            outputs = model(inputs)
+
+            optimizer.zero_grad()
+            loss = criterion(outputs, targets)
+            loss.backward()
+            optimizer.step()
+
+            epoch_loss += loss.data[0]
+
+        print(f'epoch: {epoch}, loss: {epoch_loss}')
+
+
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

@@ -11,11 +11,11 @@ from torchvision import utils, transforms
 def vis_loss(vis, win, losses):
     opts = dict(title='training loss')
 
-    return vis.line(losses, win=win, opts=opts)
+    return vis.line(losses, np.arange(1, len(losses), 1), win=win, opts=opts)
 
 def vis_image(vis, image, epoch, step, name):
     if image.is_cuda:
-        image = tensor.cpu()
+        image = image.cpu()
     if isinstance(image, autograd.Variable):
         image = image.data
     image = image.numpy()
@@ -32,7 +32,7 @@ def vis_image(vis, image, epoch, step, name):
         opts=dict(title=f'{name} (epoch: {epoch}, step: {step})'))
 
 def main(args):
-    model = network.Basic()
+    model = network.UNet()
 
     if args.cuda:
         model.cuda()
@@ -41,19 +41,20 @@ def main(args):
         input_transform=transforms.Compose([
             transforms.CenterCrop(256),
             transforms.ToTensor(),
+            transforms.Lambda(lambda t: t[0].unsqueeze(0)),
         ]),
         target_transform=transforms.Compose([
             transforms.CenterCrop(256),
             transforms.ToTensor(),
-            transforms.Lambda(lambda t: t.mul(255).long()[0]),
+            transforms.Lambda(lambda t: t.mul(255).long()[0].unsqueeze(0)),
         ])), num_workers=args.num_workers, batch_size=args.batch_size)
 
     optimizer = optim.Adam(model.parameters())
-    criterion = network.CrossEntropySoftmax2d()
+    criterion = nn.CrossEntropyLoss()
 
     if args.visualize:
         win = None
-        vis = visdom.Visdom()
+        vis = visdom.Visdom(port=80)
 
     total_loss = []
 
@@ -64,12 +65,14 @@ def main(args):
             if args.cuda:
                 images = images.cuda()
                 labels = labels.cuda()
+                criterion = criterion.cuda()
+
             inputs = autograd.Variable(images)
             targets = autograd.Variable(labels)
             outputs = model(inputs)
 
             optimizer.zero_grad()
-            loss = criterion(outputs, targets)
+            loss = criterion(outputs.view(-1, 256), targets.view(-1))
             loss.backward()
             optimizer.step()
 

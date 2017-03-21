@@ -8,6 +8,11 @@ from torch import nn, optim, autograd
 from torch.utils import data
 from torchvision import utils, transforms
 
+def vis_loss(vis, win, losses):
+    opts = dict(title='training loss')
+
+    return vis.line(losses, win=win, opts=opts)
+
 def vis_image(vis, image, epoch, step, name):
     if image.is_cuda:
         image = tensor.cpu()
@@ -46,8 +51,11 @@ def main(args):
     optimizer = optim.Adam(model.parameters())
     criterion = network.CrossEntropySoftmax2d()
 
-    if args.visdom:
+    if args.visualize:
+        win = None
         vis = visdom.Visdom()
+
+    total_loss = []
 
     for epoch in range(args.num_epochs+1):
         epoch_loss = []
@@ -66,19 +74,24 @@ def main(args):
             optimizer.step()
 
             epoch_loss.append(loss.data[0])
+            total_loss.append(loss.data[0])
 
-            if args.visdom and step % args.visdom_steps == 0:
-                vis_image(vis, inputs[0], epoch, step, 'input')
-                vis_image(vis, outputs[0], epoch, step, 'output')
-                vis_image(vis, targets[0], epoch, step, 'target')
+            if args.visualize:
+                if len(total_loss) > 1:
+                    win = vis_loss(vis, win, total_loss)
+
+                if step % args.visualize_steps == 0:
+                    vis_image(vis, inputs[0], epoch, step, 'input')
+                    vis_image(vis, outputs[0], epoch, step, 'output')
+                    vis_image(vis, targets[0], epoch, step, 'target')
 
         print(f'epoch: {epoch}, epoch_loss: {sum(epoch_loss)}')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--cuda', action='store_true')
-    parser.add_argument('--visdom', action='store_true')
-    parser.add_argument('--visdom-steps', type=int, default=10)
+    parser.add_argument('--visualize', action='store_true')
+    parser.add_argument('--visualize-steps', type=int, default=10)
     parser.add_argument('--num-epochs', type=int, default=5)
     parser.add_argument('--num-workers', type=int, default=2)
     parser.add_argument('--batch-size', type=int, default=1)

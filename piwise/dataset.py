@@ -22,10 +22,10 @@ class VOC2012(data.Dataset):
 
     def __init__(self, root, input_transform=None, target_transform=None):
         self.images_root = os.path.join(root, 'images')
-        self.classes_root = os.path.join(root, 'classes')
+        self.labels_root = os.path.join(root, 'labels')
 
         self.filenames = [image_basename(f)
-            for f in os.listdir(self.classes_root) if is_image(f)]
+            for f in os.listdir(self.labels_root) if is_image(f)]
         self.filenames.sort()
 
         self.input_transform = input_transform
@@ -36,15 +36,15 @@ class VOC2012(data.Dataset):
 
         with open(image_path(self.images_root, filename, '.jpg'), 'rb') as f:
             image = load_image(f)
-        with open(image_path(self.classes_root, filename, '.png'), 'rb') as f:
-            classes = load_image(f)
+        with open(image_path(self.labels_root, filename, '.png'), 'rb') as f:
+            label = load_image(f)
 
         if self.input_transform is not None:
             image = self.input_transform(image)
         if self.target_transform is not None:
-            classes = self.target_transform(classes)
+            label = self.target_transform(label)
 
-        return image, classes
+        return image, label
 
     def __len__(self):
         return len(self.filenames)

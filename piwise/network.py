@@ -20,7 +20,7 @@ class CrossEntropy2d(nn.Module):
         self.loss = nn.NLLLoss2d()
 
     def forward(self, inputs, targets):
-        return self.loss(F.softmax(inputs), targets)
+        return self.loss(F.softmax(inputs), targets).mul(-1)
 
 class UNetConv(nn.Module):
 

@@ -7,10 +7,20 @@ class Basic(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.conv = nn.Conv2d(3, 256, 3, 1, 1)
+        self.conv = nn.Conv2d(1, 256, 3, 1, 1)
 
     def forward(self, image):
         return self.conv(image)
+
+class CrossEntropy2d(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+        self.loss = nn.NLLLoss2d()
+
+    def forward(self, inputs, targets):
+        return self.loss(F.softmax(inputs), targets)
 
 class UNetConv(nn.Module):
 

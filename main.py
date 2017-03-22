@@ -8,6 +8,8 @@ from torch import nn, optim, autograd
 from torch.utils import data
 from torchvision import utils, transforms
 
+win = None
+
 def vis_loss(vis, win, losses):
     opts = dict(title='training loss')
 
@@ -31,30 +33,8 @@ def vis_image(vis, image, epoch, step, name):
     vis.image(image,
         opts=dict(title=f'{name} (epoch: {epoch}, step: {step})'))
 
-def main(args):
-    model = network.UNet()
-
-    if args.cuda:
-        model.cuda()
-
-    loader = data.DataLoader(dataset.VOC2012(args.dataroot,
-        input_transform=transforms.Compose([
-            transforms.CenterCrop(256),
-            transforms.ToTensor(),
-            transforms.Lambda(lambda t: t[0].unsqueeze(0)),
-        ]),
-        target_transform=transforms.Compose([
-            transforms.CenterCrop(256),
-            transforms.ToTensor(),
-            transforms.Lambda(lambda t: t.mul(255).long()[0].unsqueeze(0)),
-        ])), num_workers=args.num_workers, batch_size=args.batch_size)
-
-    optimizer = optim.Adam(model.parameters())
-    criterion = nn.CrossEntropyLoss()
-
-    if args.visualize:
-        win = None
-        vis = visdom.Visdom(port=80)
+def train(args, model, loader, optimizer, criterion):
+    model.train()
 
     total_loss = []
 
@@ -71,8 +51,10 @@ def main(args):
             targets = autograd.Variable(labels)
             outputs = model(inputs)
 
+            print(outputs.size(), targets.size())
+
             optimizer.zero_grad()
-            loss = criterion(outputs.view(-1, 256), targets.view(-1))
+            loss = criterion(outputs, targets[0])
             loss.backward()
             optimizer.step()
 
@@ -90,14 +72,44 @@ def main(args):
 
         print(f'epoch: {epoch}, epoch_loss: {sum(epoch_loss)}')
 
+def main(args):
+    if args.model == 'basic':
+        model = network.Basic()
+    if args.model == 'unet':
+        model = network.UNet()
+
+    if args.cuda:
+        model.cuda()
+
+    loader = data.DataLoader(dataset.VOC2012(args.dataroot,
+        input_transform=transforms.Compose([
+            transforms.CenterCrop(256),
+            transforms.ToTensor(),
+            transforms.Lambda(lambda t: t[0].unsqueeze(0)),
+        ]),
+        target_transform=transforms.Compose([
+            transforms.CenterCrop(256),
+            transforms.ToTensor(),
+            transforms.Lambda(lambda t: t.mul(255).long()[0].unsqueeze(0)),
+        ])), num_workers=args.num_workers, batch_size=args.batch_size)
+
+    optimizer = optim.Adam(model.parameters())
+    criterion = network.CrossEntropy2d()
+
+    if args.visualize:
+        win = None
+        vis = visdom.Visdom(port=80)
+
+    train(args, model, loader, optimizer, criterion)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--cuda', action='store_true')
+    parser.add_argument('--model', choices=['basic', 'unet'], required=True)
     parser.add_argument('--visualize', action='store_true')
     parser.add_argument('--visualize-steps', type=int, default=10)
     parser.add_argument('--num-epochs', type=int, default=5)
     parser.add_argument('--num-workers', type=int, default=2)
     parser.add_argument('--batch-size', type=int, default=1)
     parser.add_argument('--dataroot', nargs='?', default='data')
-    parser.add_argument('--trainroot', nargs='?', default='train')
     main(parser.parse_args())

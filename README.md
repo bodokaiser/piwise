@@ -29,6 +29,26 @@ pyenv activate piwise
 
 then install requirements with `pip install -r requirements.txt`.
 
+## Usage
+
+If you want to have visualization open an extra tab with:
+
+```
+python -m visdom.server -port 5000
+```
+
+Then start training:
+
+```
+python main.py --model basic --visualize --port 5000
+```
+
+or if you have a large CUDA card:
+
+```
+python main.py --model unet --cuda --visualize --port 5000
+```
+
 [pyenv]: https://github.com/pyenv/pyenv
 [pytorch]: http://pytorch.org
 [dataset]: http://host.robots.ox.ac.uk/pascal/VOC/

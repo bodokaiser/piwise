@@ -7,7 +7,7 @@ from torch.utils import data
 EXTENSIONS = ['.jpg', '.png']
 
 def load_image(file):
-    return Image.open(file).convert('RGB')
+    return Image.open(file)
 
 def is_image(filename):
     return any(filename.endswith(ext) for ext in EXTENSIONS)
@@ -35,9 +35,9 @@ class VOC2012(data.Dataset):
         filename = self.filenames[index]
 
         with open(image_path(self.images_root, filename, '.jpg'), 'rb') as f:
-            image = load_image(f)
+            image = load_image(f).convert('RGB')
         with open(image_path(self.labels_root, filename, '.png'), 'rb') as f:
-            label = load_image(f)
+            label = load_image(f).convert('P')
 
         if self.input_transform is not None:
             image = self.input_transform(image)

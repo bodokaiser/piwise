@@ -1,4 +1,7 @@
 import numpy as np
+import torch
+
+from PIL import Image
 
 # can be used to convert from (grayscale) class to object label
 def colormap(n):
@@ -15,3 +18,19 @@ def colormap(n):
         cmap[i,:] = np.array([r, g, b])
 
     return cmap
+
+class Relabel:
+
+    def __init__(self, olabel, nlabel):
+        self.olabel = olabel
+        self.nlabel = nlabel
+
+    def __call__(self, tensor):
+        assert isinstance(tensor, torch.LongTensor), 'tensor needs to be LongTensor'
+        tensor[tensor == self.olabel] = self.nlabel
+        return tensor
+
+class ToLabel:
+
+    def __call__(self, image):
+        return torch.from_numpy(np.array(image)).long()

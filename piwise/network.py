@@ -4,10 +4,10 @@ import torch.nn.functional as F
 
 class Basic(nn.Module):
 
-    def __init__(self):
+    def __init__(self, num_classes):
         super().__init__()
 
-        self.conv = nn.Conv2d(1, 256, 3, 1, 1)
+        self.conv = nn.Conv2d(1, num_classes, 3, 1, 1)
 
     def forward(self, image):
         return self.conv(image)
@@ -75,7 +75,7 @@ class UNetDecode(nn.Module):
 
 class UNet(nn.Module):
 
-    def __init__(self):
+    def __init__(self, num_classes):
         super().__init__()
 
         self.encode1 = UNetEncode(1, 64)
@@ -87,7 +87,7 @@ class UNet(nn.Module):
         self.decode3 = UNetDecode(512, 256)
         self.decode2 = UNetDecode(256, 128)
         self.decode1 = UNetDecode(128, 64)
-        self.final = nn.Conv2d(64, 256, 1)
+        self.final = nn.Conv2d(64, num_classes, 1)
 
     def forward(self, inputs):
         encode1 = self.encode1(inputs)

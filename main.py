@@ -1,12 +1,15 @@
 import argparse
 import numpy as np
+import torch
 import visdom
 
-from piwise import network, dataset
+from piwise import network, dataset, transform
 
 from torch import nn, optim, autograd
 from torch.utils import data
 from torchvision import utils, transforms
+
+NUM_CLASSES = 22
 
 win = None
 
@@ -54,7 +57,7 @@ def train(args, model, loader, optimizer, criterion):
             print(outputs.size(), targets.size())
 
             optimizer.zero_grad()
-            loss = criterion(outputs, targets[0])
+            loss = criterion(outputs, targets)
             loss.backward()
             optimizer.step()
 
@@ -72,11 +75,12 @@ def train(args, model, loader, optimizer, criterion):
 
         print(f'epoch: {epoch}, epoch_loss: {sum(epoch_loss)}')
 
+
 def main(args):
     if args.model == 'basic':
-        model = network.Basic()
+        model = network.Basic(NUM_CLASSES)
     if args.model == 'unet':
-        model = network.UNet()
+        model = network.UNet(NUM_CLASSES)
 
     if args.cuda:
         model.cuda()
@@ -85,12 +89,14 @@ def main(args):
         input_transform=transforms.Compose([
             transforms.CenterCrop(256),
             transforms.ToTensor(),
+            # our models currently only support one color channel 
             transforms.Lambda(lambda t: t[0].unsqueeze(0)),
         ]),
         target_transform=transforms.Compose([
             transforms.CenterCrop(256),
-            transforms.ToTensor(),
-            transforms.Lambda(lambda t: t.mul(255).long()[0].unsqueeze(0)),
+            transform.ToLabel(),
+            # reduces number of classes to 22 as we drop 22-255
+            transform.Relabel(255, 21),
         ])), num_workers=args.num_workers, batch_size=args.batch_size)
 
     optimizer = optim.Adam(model.parameters())

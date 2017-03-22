@@ -11,12 +11,9 @@ from torchvision import utils, transforms
 
 NUM_CLASSES = 22
 
-win = None
-
 def vis_loss(vis, win, losses):
     opts = dict(title='training loss')
-
-    return vis.line(losses, np.arange(1, len(losses), 1), win=win, opts=opts)
+    return vis.line(losses, np.arange(1, len(losses)+1, 1), win=win, opts=opts)
 
 def vis_image(vis, image, epoch, step, name):
     if image.is_cuda:
@@ -39,6 +36,10 @@ def vis_image(vis, image, epoch, step, name):
 def train(args, model, loader, optimizer, criterion):
     model.train()
 
+    if args.visualize:
+        win = None
+        vis = visdom.Visdom(port=args.port)
+
     total_loss = []
 
     for epoch in range(args.num_epochs+1):
@@ -54,8 +55,6 @@ def train(args, model, loader, optimizer, criterion):
             targets = autograd.Variable(labels)
             outputs = model(inputs)
 
-            print(outputs.size(), targets.size())
-
             optimizer.zero_grad()
             loss = criterion(outputs, targets)
             loss.backward()
@@ -64,14 +63,14 @@ def train(args, model, loader, optimizer, criterion):
             epoch_loss.append(loss.data[0])
             total_loss.append(loss.data[0])
 
-            if args.visualize:
+            if args.visualize and step % args.visualize_steps == 0:
                 if len(total_loss) > 1:
                     win = vis_loss(vis, win, total_loss)
 
-                if step % args.visualize_steps == 0:
-                    vis_image(vis, inputs[0], epoch, step, 'input')
-                    vis_image(vis, outputs[0], epoch, step, 'output')
-                    vis_image(vis, targets[0], epoch, step, 'target')
+                output = torch.from_numpy(outputs[0].data.numpy().argmax(0))
+                vis_image(vis, inputs[0], epoch, step, 'input')
+                vis_image(vis, targets[0], epoch, step, 'target')
+                vis_image(vis, output, epoch, step, 'output')
 
         print(f'epoch: {epoch}, epoch_loss: {sum(epoch_loss)}')
 
@@ -102,14 +101,11 @@ def main(args):
     optimizer = optim.Adam(model.parameters())
     criterion = network.CrossEntropy2d()
 
-    if args.visualize:
-        win = None
-        vis = visdom.Visdom(port=80)
-
     train(args, model, loader, optimizer, criterion)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--port', type=int, default=80)
     parser.add_argument('--cuda', action='store_true')
     parser.add_argument('--model', choices=['basic', 'unet'], required=True)
     parser.add_argument('--visualize', action='store_true')

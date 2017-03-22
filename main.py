@@ -13,14 +13,17 @@ NUM_CLASSES = 22
 
 def vis_loss(vis, win, losses):
     opts = dict(title='training loss')
-    return vis.line(losses, np.arange(1, len(losses)+1, 1), win=win, opts=opts)
+
+    return vis.line(losses, np.arange(1, len(losses)+1, 1), win=win,
+        env='loss', opts=opts)
 
 def vis_image(vis, image, epoch, step, name):
-    if image.is_cuda:
-        image = image.cpu()
-    if isinstance(image, autograd.Variable):
-        image = image.data
-    image = image.numpy()
+    if not isinstance(image, np.ndarray):
+        if image.is_cuda:
+            image = image.cpu()
+        if isinstance(image, autograd.Variable):
+            image = image.data
+        image = image.numpy()
 
     if len(image.shape) == 3:
         if image.shape[0] == 3:
@@ -30,8 +33,9 @@ def vis_image(vis, image, epoch, step, name):
     if image.dtype == np.int64:
         image = image.astype(np.uint8)
 
-    vis.image(image,
-        opts=dict(title=f'{name} (epoch: {epoch}, step: {step})'))
+    opts = dict(title=f'{name} (epoch: {epoch}, step: {step})')
+
+    vis.heatmap(np.flipud(image), env='images', opts=opts)
 
 def train(args, model, loader, optimizer, criterion):
     model.train()
@@ -67,10 +71,14 @@ def train(args, model, loader, optimizer, criterion):
                 if len(total_loss) > 1:
                     win = vis_loss(vis, win, total_loss)
 
-                output = torch.from_numpy(outputs[0].data.numpy().argmax(0))
+                output = outputs[0]
+                if output.is_cuda:
+                    output = output.cpu()
+                output = output.data.numpy().argmax(0)
+
                 vis_image(vis, inputs[0], epoch, step, 'input')
-                vis_image(vis, targets[0], epoch, step, 'target')
                 vis_image(vis, output, epoch, step, 'output')
+                vis_image(vis, targets[0], epoch, step, 'target')
 
         print(f'epoch: {epoch}, epoch_loss: {sum(epoch_loss)}')
 

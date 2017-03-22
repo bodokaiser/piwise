@@ -71,13 +71,8 @@ def train(args, model, loader, optimizer, criterion):
                 if len(total_loss) > 1:
                     win = vis_loss(vis, win, total_loss)
 
-                output = outputs[0]
-                if output.is_cuda:
-                    output = output.cpu()
-                output = output.data.numpy().argmax(0)
-
                 vis_image(vis, inputs[0], epoch, step, 'input')
-                vis_image(vis, output, epoch, step, 'output')
+                vis_image(vis, outputs[0].max(0)[1], epoch, step, 'output')
                 vis_image(vis, targets[0], epoch, step, 'target')
 
         print(f'epoch: {epoch}, epoch_loss: {sum(epoch_loss)}')

@@ -102,7 +102,7 @@ def main(args):
         ])), num_workers=args.num_workers, batch_size=args.batch_size)
 
     optimizer = optim.Adam(model.parameters())
-    criterion = network.CrossEntropy2d()
+    criterion = nn.NLLLoss2d()
 
     train(args, model, loader, optimizer, criterion)
 

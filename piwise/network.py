@@ -9,35 +9,22 @@ class Basic(nn.Module):
 
         self.conv = nn.Conv2d(1, num_classes, 3, 1, 1)
 
-    def forward(self, image):
-        return self.conv(image)
+    def forward(self, inputs):
+        outputs = F.softmax(self.conv(inputs))
 
-class CrossEntropy2d(nn.Module):
-
-    def __init__(self):
-        super().__init__()
-
-        self.loss = nn.NLLLoss2d()
-
-    def forward(self, inputs, targets):
-        return self.loss(F.softmax(inputs), targets).mul(-1)
+        return outputs
 
 class UNetConv(nn.Module):
 
     def __init__(self, in_size, out_size):
         super().__init__()
 
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(in_size, out_size, 3, 1, 1),
-            nn.ReLU(),
-        )
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(out_size, out_size, 3, 1, 1),
-            nn.ReLU())
+        self.conv1 = nn.Conv2d(in_size, out_size, 3, 1, 1)
+        self.conv2 = nn.Conv2d(out_size, out_size, 3, 1, 1)
 
     def forward(self, inputs):
-        outputs = self.conv1(inputs)
-        outputs = self.conv2(outputs)
+        outputs = F.relu(self.conv1(inputs))
+        outputs = F.relu(self.conv2(outputs))
 
         return outputs
 
@@ -100,4 +87,4 @@ class UNet(nn.Module):
         decode2 = self.decode2(encode2, decode3)
         decode1 = self.decode1(encode1, decode2)
 
-        return self.final(decode1)
+        return F.softmax(self.final(decode1))

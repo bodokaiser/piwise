@@ -3,11 +3,13 @@ import numpy as np
 import torch
 import visdom
 
-from piwise import network, dataset, transform
+from PIL import Image
 
 from torch import nn, optim, autograd
 from torch.utils import data
 from torchvision import utils, transforms
+
+from piwise import network, dataset, transform
 
 NUM_CLASSES = 22
 
@@ -18,24 +20,15 @@ def vis_loss(vis, win, losses):
         env='loss', opts=opts)
 
 def vis_image(vis, image, epoch, step, name):
-    if not isinstance(image, np.ndarray):
-        if image.is_cuda:
-            image = image.cpu()
-        if isinstance(image, autograd.Variable):
-            image = image.data
-        image = image.numpy()
-
-    if len(image.shape) == 3:
-        if image.shape[0] == 3:
-            image = image.transpose((1, 2, 0))
-        if image.shape[0] == 1:
-            image = image[0].transpose((0, 1))
-    if image.dtype == np.int64:
-        image = image.astype(np.uint8)
+    if image.is_cuda:
+        image = image.cpu()
+    if isinstance(image, autograd.Variable):
+        image = image.data
+    image = image.numpy().transpose((1, 2, 0))
 
     opts = dict(title=f'{name} (epoch: {epoch}, step: {step})')
 
-    vis.heatmap(np.flipud(image), env='images', opts=opts)
+    vis.image(image, env='images', opts=opts)
 
 def train(args, model, loader, optimizer, criterion):
     model.train()
@@ -57,10 +50,11 @@ def train(args, model, loader, optimizer, criterion):
 
             inputs = autograd.Variable(images)
             targets = autograd.Variable(labels)
-            outputs = model(inputs)
+            # our models only supports one color channel
+            outputs = model(inputs[:, 0].unsqueeze(1))
 
             optimizer.zero_grad()
-            loss = criterion(outputs, targets)
+            loss = criterion(outputs, targets[:, 0])
             loss.backward()
             optimizer.step()
 
@@ -68,12 +62,17 @@ def train(args, model, loader, optimizer, criterion):
             total_loss.append(loss.data[0])
 
             if args.visualize and step % args.visualize_steps == 0:
+                colorize = transform.Colorize()
+
+                output = colorize(outputs[0].cpu().max(0)[1].data)
+                target = colorize(targets[0].cpu().data)
+
                 if len(total_loss) > 1:
                     win = vis_loss(vis, win, total_loss)
 
                 vis_image(vis, inputs[0], epoch, step, 'input')
-                vis_image(vis, outputs[0].max(0)[1], epoch, step, 'output')
-                vis_image(vis, targets[0], epoch, step, 'target')
+                vis_image(vis, output, epoch, step, 'output')
+                vis_image(vis, target, epoch, step, 'target')
 
         print(f'epoch: {epoch}, epoch_loss: {sum(epoch_loss)}')
 
@@ -91,13 +90,10 @@ def main(args):
         input_transform=transforms.Compose([
             transforms.CenterCrop(256),
             transforms.ToTensor(),
-            # our models currently only support one color channel 
-            transforms.Lambda(lambda t: t[0].unsqueeze(0)),
         ]),
         target_transform=transforms.Compose([
             transforms.CenterCrop(256),
             transform.ToLabel(),
-            # reduces number of classes to 22 as we drop 22-255
             transform.Relabel(255, 21),
         ])), num_workers=args.num_workers, batch_size=args.batch_size)
 

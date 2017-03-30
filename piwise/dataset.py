@@ -2,7 +2,8 @@ import numpy as np
 import os
 
 from PIL import Image
-from torch.utils import data
+
+from torch.utils.data import Dataset
 
 EXTENSIONS = ['.jpg', '.png']
 
@@ -18,7 +19,7 @@ def image_path(root, basename, extension):
 def image_basename(filename):
     return os.path.basename(os.path.splitext(filename)[0])
 
-class VOC2012(data.Dataset):
+class Voc12(Dataset):
 
     def __init__(self, root, input_transform=None, target_transform=None):
         self.images_root = os.path.join(root, 'images')

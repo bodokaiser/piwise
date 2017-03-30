@@ -2,17 +2,20 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class Basic(nn.Module):
+class Simple(nn.Module):
 
-    def __init__(self, num_classes):
+    def __init__(self, num_channels, num_classes):
         super().__init__()
 
-        self.conv = nn.Conv2d(1, num_classes, 3, 1, 1)
+        self.conv1 = nn.Conv2d(num_channels, 4, 1)
+        self.conv2 = nn.Conv2d(4, 8, 3, padding=1)
+        self.conv3 = nn.Conv2d(8, num_classes, 3, padding=1)
 
-    def forward(self, inputs):
-        outputs = F.softmax(self.conv(inputs))
-
-        return outputs
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = F.softmax(self.conv3(x))
+        return x
 
 class UNetConv(nn.Module):
 

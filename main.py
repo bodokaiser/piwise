@@ -1,41 +1,27 @@
-import argparse
 import numpy as np
 import torch
-import visdom
+import torch.nn as nn
 
 from PIL import Image
+from visdom import Visdom
+from argparse import ArgumentParser
 
-from torch import nn, optim, autograd
-from torch.utils import data
-from torchvision import utils, transforms
+from torch.optim import Adam
+from torch.autograd import Variable
+from torch.utils.data import DataLoader
+from torchvision.transforms import Compose, CenterCrop, ToTensor
 
-from piwise import network, dataset, transform
-
-NUM_CLASSES = 22
-
-def vis_loss(vis, win, losses):
-    opts = dict(title='training loss')
-
-    return vis.line(losses, np.arange(1, len(losses)+1, 1), win=win,
-        env='loss', opts=opts)
-
-def vis_image(vis, image, epoch, step, name):
-    if image.is_cuda:
-        image = image.cpu()
-    if isinstance(image, autograd.Variable):
-        image = image.data
-    image = image.numpy().transpose((1, 2, 0))
-
-    opts = dict(title=f'{name} (epoch: {epoch}, step: {step})')
-
-    vis.image(image, env='images', opts=opts)
+from piwise.dataset import Voc12
+from piwise.network import Simple
+from piwise.criterion import CrossEntropyLoss2d
+from piwise.transform import Relabel, ToLabel, Colorize
+from piwise.visualize import Dashboard
 
 def train(args, model, loader, optimizer, criterion):
     model.train()
 
     if args.visualize:
-        win = None
-        vis = visdom.Visdom(port=args.port)
+        board = Dashboard(args.port)
 
     total_loss = []
 
@@ -48,13 +34,12 @@ def train(args, model, loader, optimizer, criterion):
                 labels = labels.cuda()
                 criterion = criterion.cuda()
 
-            inputs = autograd.Variable(images)
-            targets = autograd.Variable(labels)
-            # our models only supports one color channel
-            outputs = model(inputs[:, 0].unsqueeze(1))
+            inputs = Variable(images)
+            targets = Variable(labels)
+            outputs = model(inputs)
 
             optimizer.zero_grad()
-            loss = criterion(outputs, targets[:, 0])
+            loss = criterion(outputs, targets[0]).mul(-1)
             loss.backward()
             optimizer.step()
 
@@ -62,52 +47,59 @@ def train(args, model, loader, optimizer, criterion):
             total_loss.append(loss.data[0])
 
             if args.visualize and step % args.visualize_steps == 0:
-                colorize = transform.Colorize()
+                colorize = Colorize()
 
-                output = colorize(outputs[0].cpu().max(0)[1].data)
-                target = colorize(targets[0].cpu().data)
+                outputs = outputs[0].cpu().max(0)[1]
+                targets = targets[0].cpu()
+
+                output = colorize(outputs.data)
+                output_median = outputs.view(-1).median(0)[0].data[0]
+                target = colorize(targets.data)
+                target_median = targets.view(-1).median(0)[0].data[0]
 
                 if len(total_loss) > 1:
-                    win = vis_loss(vis, win, total_loss)
+                    board.loss(total_loss, 'training loss')
 
-                vis_image(vis, inputs[0], epoch, step, 'input')
-                vis_image(vis, output, epoch, step, 'output')
-                vis_image(vis, target, epoch, step, 'target')
+                title = lambda n: f'{n} (epoch: {epoch}, step: {step})'
+
+                board.image(inputs[0], title('input'))
+                board.image(output, title(f'output [{output_median}]'))
+                board.image(target, title(f'target [{target_median}]'))
 
         print(f'epoch: {epoch}, epoch_loss: {sum(epoch_loss)}')
 
+NUM_CHANNELS = 3
+NUM_CLASSES = 22
 
 def main(args):
-    if args.model == 'basic':
-        model = network.Basic(NUM_CLASSES)
-    if args.model == 'unet':
-        model = network.UNet(NUM_CLASSES)
+    if args.model == 'simple':
+        model = Simple(NUM_CHANNELS, NUM_CLASSES)
 
     if args.cuda:
         model.cuda()
 
-    loader = data.DataLoader(dataset.VOC2012(args.dataroot,
-        input_transform=transforms.Compose([
-            transforms.CenterCrop(256),
-            transforms.ToTensor(),
+    loader = DataLoader(Voc12(args.dataroot,
+        input_transform=Compose([
+            CenterCrop(256),
+            ToTensor(),
         ]),
-        target_transform=transforms.Compose([
-            transforms.CenterCrop(256),
-            transform.ToLabel(),
-            transform.Relabel(255, 21),
+        target_transform=Compose([
+            CenterCrop(256),
+            ToLabel(),
+            Relabel(255, 21),
         ])), num_workers=args.num_workers, batch_size=args.batch_size)
 
-    optimizer = optim.Adam(model.parameters())
-    criterion = nn.NLLLoss2d()
+    optimizer = Adam(model.parameters())
+    criterion = CrossEntropyLoss2d()
 
     train(args, model, loader, optimizer, criterion)
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+    parser = ArgumentParser()
     parser.add_argument('--port', type=int, default=80)
     parser.add_argument('--cuda', action='store_true')
-    parser.add_argument('--model', choices=['basic', 'unet'], required=True)
-    parser.add_argument('--visualize', action='store_true')
+    parser.add_argument('--model', choices=['basic', 'simple'], required=True)
+    parser.add_argument('--visualize', choices=['dashboard'])
     parser.add_argument('--visualize-steps', type=int, default=10)
     parser.add_argument('--num-epochs', type=int, default=5)
     parser.add_argument('--num-workers', type=int, default=2)

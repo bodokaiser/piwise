@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch.nn.functional as F
 
 class CrossEntropyLoss2d(nn.Module):
 
@@ -7,5 +8,5 @@ class CrossEntropyLoss2d(nn.Module):
 
         self.loss = nn.NLLLoss2d()
 
-    def forward(self, x, y):
-        return self.loss(x, y).mul(-1)
+    def forward(self, outputs, targets):
+        return self.loss(F.log_softmax(outputs), targets)

@@ -2,20 +2,37 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class Simple(nn.Module):
+class SimpleCNN(nn.Module):
 
     def __init__(self, num_channels, num_classes):
         super().__init__()
 
-        self.conv1 = nn.Conv2d(num_channels, 4, 1)
-        self.conv2 = nn.Conv2d(4, 8, 3, padding=1)
-        self.conv3 = nn.Conv2d(8, num_classes, 3, padding=1)
+        num_features = num_classes*num_channels*12
+        self.conv1 = nn.Conv2d(num_channels, num_features, 3, padding=1)
+        self.conv2 = nn.Conv2d(num_features, num_classes, 1)
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+
+        return self.conv2(x)
+
+
+class AdvancedCNN(nn.Module):
+
+    def __init__(self, num_channels, num_classes):
+        super().__init__()
+
+        self.conv1 = nn.Conv2d(num_channels, num_channels*24, 3, padding=1)
+        self.conv2 = nn.Conv2d(num_channels*24, num_channels*64, 3, padding=1)
+        self.conv3 = nn.Conv2d(num_channels*64, num_classes*24, 6, padding=1)
+        self.conv4 = nn.Conv2d(num_classes*24, num_classes, 1, padding=1)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
-        x = F.softmax(self.conv3(x))
-        return x
+
+        return self.conv3(x)
+
 
 class UNetConv(nn.Module):
 
@@ -31,6 +48,7 @@ class UNetConv(nn.Module):
 
         return outputs
 
+
 class UNetEncode(nn.Module):
 
     def __init__(self, in_size, out_size):
@@ -44,6 +62,7 @@ class UNetEncode(nn.Module):
         outputs = self.down(outputs)
 
         return outputs
+
 
 class UNetDecode(nn.Module):
 
@@ -63,31 +82,28 @@ class UNetDecode(nn.Module):
 
         return self.conv(torch.cat([outputs1, outputs2], 1))
 
+
 class UNet(nn.Module):
 
-    def __init__(self, num_classes):
+    def __init__(self, num_channels, num_classes):
         super().__init__()
 
-        self.encode1 = UNetEncode(1, 64)
-        self.encode2 = UNetEncode(64, 128)
-        self.encode3 = UNetEncode(128, 256)
-        self.encode4 = UNetEncode(256, 512)
-        self.center = UNetConv(512, 1024)
-        self.decode4 = UNetDecode(1024, 512)
-        self.decode3 = UNetDecode(512, 256)
-        self.decode2 = UNetDecode(256, 128)
-        self.decode1 = UNetDecode(128, 64)
-        self.final = nn.Conv2d(64, num_classes, 1)
+        self.encode1 = UNetEncode(num_channels, 32*num_channels)
+        self.encode2 = UNetEncode(32*num_channels, 64*num_channels)
+        self.encode3 = UNetEncode(128*num_channels, 256*num_channels)
+        self.center = UNetConv(256*num_channels, 512*num_channels)
+        self.decode3 = UNetDecode(512*num_channels, 256*num_channels)
+        self.decode2 = UNetDecode(256*num_channels, 128*num_channels)
+        self.decode1 = UNetDecode(64*num_channels, 32*num_channels)
+        self.final = nn.Conv2d(32, num_classes, 1)
 
     def forward(self, inputs):
         encode1 = self.encode1(inputs)
         encode2 = self.encode2(encode1)
         encode3 = self.encode3(encode2)
-        encode4 = self.encode4(encode3)
-        center = self.center(encode4)
-        decode4 = self.decode4(encode4, center)
-        decode3 = self.decode3(encode3, decode4)
+        center = self.center(encode3)
+        decode3 = self.decode3(encode3, center)
         decode2 = self.decode2(encode2, decode3)
         decode1 = self.decode1(encode1, decode2)
 
-        return F.softmax(self.final(decode1))
+        return self.final(decode1)

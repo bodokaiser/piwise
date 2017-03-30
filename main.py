@@ -1,9 +1,6 @@
 import numpy as np
-import torch
-import torch.nn as nn
 
 from PIL import Image
-from visdom import Visdom
 from argparse import ArgumentParser
 
 from torch.optim import Adam
@@ -12,8 +9,8 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, CenterCrop, ToTensor
 
 from piwise.dataset import Voc12
-from piwise.network import Simple
 from piwise.trainer import Trainer
+from piwise.network import SimpleCNN, AdvancedCNN, UNet
 from piwise.criterion import CrossEntropyLoss2d
 from piwise.transform import Relabel, ToLabel, Colorize
 from piwise.visualize import Dashboard
@@ -65,8 +62,14 @@ NUM_CHANNELS = 3
 NUM_CLASSES = 22
 
 def main(args):
-    if args.model == 'simple':
-        model = Simple(NUM_CHANNELS, NUM_CLASSES)
+    Net = SimpleCNN
+
+    if args.model == 'advanced':
+        Net = AdvancedCNN
+    if args.model == 'unet':
+        Net = UNet
+
+    model = Net(NUM_CHANNELS, NUM_CLASSES)
 
     loader = DataLoader(Voc12(args.dataroot,
         input_transform=Compose([
@@ -97,7 +100,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--port', type=int, default=80)
     parser.add_argument('--cuda', action='store_true')
-    parser.add_argument('--model', choices=['basic', 'simple'], required=True)
+    parser.add_argument('--model', choices=['simple', 'advanced', 'unet'])
     parser.add_argument('--visualize', choices=['dashboard'])
     parser.add_argument('--visualize-loss-steps', type=int, default=50)
     parser.add_argument('--visualize-image-steps', type=int, default=50)

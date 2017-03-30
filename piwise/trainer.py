@@ -14,7 +14,7 @@ class Result:
 class Trainer:
 
     def __init__(self, model, optimizer, criterion):
-        self.cuda = False
+        self.is_cuda = False
         self.step_hooks = []
         self.epoch_hooks = []
         self.model = model
@@ -22,7 +22,7 @@ class Trainer:
         self.criterion = criterion
 
     def cuda(self):
-        self.cuda = True
+        self.is_cuda = True
         self.criterion = self.criterion.cuda()
 
     def plug(self, hook, every_n_steps=1, every_n_epochs=0):
@@ -35,7 +35,7 @@ class Trainer:
         self.model.train()
 
         for step, (images, labels) in enumerate(loader):
-            if self.cuda:
+            if self.is_cuda:
                 images = images.cuda()
                 labels = labels.cuda()
 

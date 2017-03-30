@@ -91,12 +91,12 @@ class UNet(nn.Module):
 
         self.encode1 = UNetEncode(num_channels, 32*num_channels)
         self.encode2 = UNetEncode(32*num_channels, 64*num_channels)
-        self.encode3 = UNetEncode(128*num_channels, 256*num_channels)
-        self.center = UNetConv(256*num_channels, 512*num_channels)
-        self.decode3 = UNetDecode(512*num_channels, 256*num_channels)
-        self.decode2 = UNetDecode(256*num_channels, 128*num_channels)
+        self.encode3 = UNetEncode(64*num_channels, 128*num_channels)
+        self.center = UNetConv(128*num_channels, 256*num_channels)
+        self.decode3 = UNetDecode(256*num_channels, 128*num_channels)
+        self.decode2 = UNetDecode(128*num_channels, 64*num_channels)
         self.decode1 = UNetDecode(64*num_channels, 32*num_channels)
-        self.final = nn.Conv2d(32, num_classes, 1)
+        self.final = nn.Conv2d(32*num_channels, num_classes, 1)
 
     def forward(self, inputs):
         encode1 = self.encode1(inputs)

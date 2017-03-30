@@ -13,60 +13,53 @@ from torchvision.transforms import Compose, CenterCrop, ToTensor
 
 from piwise.dataset import Voc12
 from piwise.network import Simple
+from piwise.trainer import Trainer
 from piwise.criterion import CrossEntropyLoss2d
 from piwise.transform import Relabel, ToLabel, Colorize
 from piwise.visualize import Dashboard
 
-def train(args, model, loader, optimizer, criterion):
-    model.train()
+class LossHook:
 
-    if args.visualize:
-        board = Dashboard(args.port)
+    def __init__(self, interval, board=None):
+        self.board =  board
+        self.interval = interval
 
-    total_loss = []
+    def __call__(self, result):
+        if result.step == 0:
+            self.loss = []
+        if result.step % self.interval == 0:
+            self.loss.append(result.loss.data[0])
 
-    for epoch in range(args.num_epochs+1):
-        epoch_loss = []
+            if len(self.loss) > 1:
+                if self.board is not None:
+                    self.board.loss(self.loss, 'training loss')
 
-        for step, (images, labels) in enumerate(loader):
-            if args.cuda:
-                images = images.cuda()
-                labels = labels.cuda()
-                criterion = criterion.cuda()
+            mean = np.mean(self.loss)
+            print(f'epoch: {result.epoch}, step: {result.step}, loss: {mean}')
 
-            inputs = Variable(images)
-            targets = Variable(labels)
-            outputs = model(inputs)
+class ImageHook:
 
-            optimizer.zero_grad()
-            loss = criterion(outputs, targets[0]).mul(-1)
-            loss.backward()
-            optimizer.step()
+    def __init__(self, board):
+        self.board = board
 
-            epoch_loss.append(loss.data[0])
-            total_loss.append(loss.data[0])
+    def __call__(self, result):
+        colorize = Colorize()
 
-            if args.visualize and step % args.visualize_steps == 0:
-                colorize = Colorize()
+        output = result.output.cpu().max(0)[1]
+        target = result.target.cpu()
 
-                outputs = outputs[0].cpu().max(0)[1]
-                targets = targets[0].cpu()
+        output_class = output.view(-1).median(0)[0].data[0]
+        target_class = target.view(-1).median(0)[0].data[0]
 
-                output = colorize(outputs.data)
-                output_median = outputs.view(-1).median(0)[0].data[0]
-                target = colorize(targets.data)
-                target_median = targets.view(-1).median(0)[0].data[0]
+        self._visualize(result, result.input, 'input')
+        self._visualize(result, colorize(output.data),
+            f'output [{output_class}]')
+        self._visualize(result, colorize(target.data),
+            f'target [{target_class}]')
 
-                if len(total_loss) > 1:
-                    board.loss(total_loss, 'training loss')
-
-                title = lambda n: f'{n} (epoch: {epoch}, step: {step})'
-
-                board.image(inputs[0], title('input'))
-                board.image(output, title(f'output [{output_median}]'))
-                board.image(target, title(f'target [{target_median}]'))
-
-        print(f'epoch: {epoch}, epoch_loss: {sum(epoch_loss)}')
+    def _visualize(self, result, image, name):
+        title = f'{name} (epoch: {result.epoch}, step: {result.step})'
+        self.board.image(image, title)
 
 NUM_CHANNELS = 3
 NUM_CLASSES = 22
@@ -74,9 +67,6 @@ NUM_CLASSES = 22
 def main(args):
     if args.model == 'simple':
         model = Simple(NUM_CHANNELS, NUM_CLASSES)
-
-    if args.cuda:
-        model.cuda()
 
     loader = DataLoader(Voc12(args.dataroot,
         input_transform=Compose([
@@ -91,8 +81,17 @@ def main(args):
 
     optimizer = Adam(model.parameters())
     criterion = CrossEntropyLoss2d()
+    trainer = Trainer(model, optimizer, criterion)
 
-    train(args, model, loader, optimizer, criterion)
+    if args.cuda:
+        model.cuda()
+        trainer.cuda()
+    if args.visualize:
+        board = Dashboard(args.port)
+
+    trainer.plug(LossHook(args.visualize_loss_steps, board))
+    trainer.plug(ImageHook(board), args.visualize_image_steps)
+    trainer.train(loader, args.num_epochs)
 
 if __name__ == '__main__':
     parser = ArgumentParser()
@@ -100,7 +99,8 @@ if __name__ == '__main__':
     parser.add_argument('--cuda', action='store_true')
     parser.add_argument('--model', choices=['basic', 'simple'], required=True)
     parser.add_argument('--visualize', choices=['dashboard'])
-    parser.add_argument('--visualize-steps', type=int, default=10)
+    parser.add_argument('--visualize-loss-steps', type=int, default=50)
+    parser.add_argument('--visualize-image-steps', type=int, default=50)
     parser.add_argument('--num-epochs', type=int, default=5)
     parser.add_argument('--num-workers', type=int, default=2)
     parser.add_argument('--batch-size', type=int, default=1)

@@ -64,8 +64,6 @@ NUM_CLASSES = 22
 def main(args):
     Net = SimpleCNN
 
-    if args.model == 'advanced':
-        Net = AdvancedCNN
     if args.model == 'unet':
         Net = UNet
 
@@ -100,12 +98,12 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--port', type=int, default=80)
     parser.add_argument('--cuda', action='store_true')
-    parser.add_argument('--model', choices=['simple', 'advanced', 'unet'])
+    parser.add_argument('--model', choices=['simple', 'unet'])
     parser.add_argument('--visualize', choices=['dashboard'])
     parser.add_argument('--visualize-loss-steps', type=int, default=50)
     parser.add_argument('--visualize-image-steps', type=int, default=50)
-    parser.add_argument('--num-epochs', type=int, default=5)
-    parser.add_argument('--num-workers', type=int, default=2)
+    parser.add_argument('--num-epochs', type=int, default=32)
+    parser.add_argument('--num-workers', type=int, default=4)
     parser.add_argument('--batch-size', type=int, default=1)
     parser.add_argument('--dataroot', nargs='?', default='data')
     main(parser.parse_args())

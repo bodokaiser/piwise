@@ -17,24 +17,6 @@ class SimpleCNN(nn.Module):
         return self.conv2(x)
 
 
-class AdvancedCNN(nn.Module):
-
-    def __init__(self, num_channels, num_classes):
-        super().__init__()
-
-        self.conv1 = nn.Conv2d(num_channels, num_channels*24, 3, padding=1)
-        self.conv2 = nn.Conv2d(num_channels*24, num_channels*64, 3, padding=1)
-        self.conv3 = nn.Conv2d(num_channels*64, num_classes*24, 3, padding=1)
-        self.conv4 = nn.Conv2d(num_classes*24, num_classes, 1)
-
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
-
-        return self.conv4(x)
-
-
 class UNetConv(nn.Module):
 
     def __init__(self, in_size, out_size):

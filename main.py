@@ -10,7 +10,7 @@ from torchvision.transforms import Compose, CenterCrop, ToTensor
 
 from piwise.dataset import Voc12
 from piwise.trainer import Trainer
-from piwise.network import SimpleCNN, AdvancedCNN, UNet
+from piwise.network import SimpleCNN
 from piwise.criterion import CrossEntropyLoss2d
 from piwise.transform import Relabel, ToLabel, Colorize
 from piwise.visualize import Dashboard
@@ -64,9 +64,6 @@ NUM_CLASSES = 22
 def main(args):
     Net = SimpleCNN
 
-    if args.model == 'unet':
-        Net = UNet
-
     model = Net(NUM_CHANNELS, NUM_CLASSES)
 
     loader = DataLoader(Voc12(args.dataroot,
@@ -98,7 +95,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--port', type=int, default=80)
     parser.add_argument('--cuda', action='store_true')
-    parser.add_argument('--model', choices=['simple', 'unet'])
+    parser.add_argument('--model', choices=['simple'])
     parser.add_argument('--visualize', choices=['dashboard'])
     parser.add_argument('--visualize-loss-steps', type=int, default=50)
     parser.add_argument('--visualize-image-steps', type=int, default=50)

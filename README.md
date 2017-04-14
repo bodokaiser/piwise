@@ -3,6 +3,11 @@
 Pixel-wise segmentation on the [VOC2012][dataset] dataset using
 [pytorch][pytorch].
 
+- [x] [FCN8](https://arxiv.org/abs/1605.06211)
+- [ ] [SegNet](https://arxiv.org/abs/1511.00561)
+- [ ] [PSPNet](https://arxiv.org/abs/1612.01105)
+- [ ] [RefineNet](https://arxiv.org/abs/1611.06612)
+
 ## Setup
 
 See dataset examples [here][dataset_example].
@@ -23,7 +28,7 @@ rm -rf VOCdevkit
 We recommend using [pyenv][pyenv]:
 
 ```
-pyenv virtualenv 3.6.0 piwise 
+pyenv virtualenv 3.6.0 piwise
 pyenv activate piwise
 ```
 

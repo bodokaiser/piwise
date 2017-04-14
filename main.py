@@ -46,7 +46,7 @@ def evaluate(args, model, loader):
         targets = Variable(labels)
         outputs = model(inputs)
 
-        return print(outputs)
+        return outputs
 
 def main(args):
     model = FCN8(NUM_CHANNELS, NUM_CLASSES)

@@ -49,7 +49,7 @@ def evaluate(args, model, loader):
         return outputs
 
 def main(args):
-    model = SegNet(NUM_CHANNELS, NUM_CLASSES)
+    model = FCN8(NUM_CHANNELS, NUM_CLASSES)
 
     loader = DataLoader(VOC12(args.dataroot,
         input_transform=Compose([

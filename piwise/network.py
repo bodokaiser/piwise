@@ -5,18 +5,21 @@ import torch.nn.functional as F
 
 class FCNConv(nn.Module):
 
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, layers):
         super().__init__()
 
-        self.conv = nn.Sequential(
+        conv = [
             nn.Conv2d(in_channels, out_channels, 3, padding=1),
             nn.ReLU(inplace=True),
+        ]
+        conv += [
             nn.Conv2d(out_channels, out_channels, 3, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, 3, padding=1),
-            nn.ReLU(inplace=True),
+        ] * layers
+        conv += [
             nn.MaxPool2d(2, stride=2, ceil_mode=True),
-        )
+        ]
+        self.conv = nn.Sequential(*conv)
 
     def forward(self, x):
         return self.conv(x)
@@ -27,22 +30,10 @@ class FCN8(nn.Module):
     def __init__(self, num_channels, num_classes):
         super().__init__()
 
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(num_channels, 64, 3, padding=100),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 64, 3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2, stride=2, ceil_mode=True),
-        )
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(64, 128, 3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(128, 128, 3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2, stride=2, ceil_mode=True),
-        )
-        self.conv3 = FCNConv(128, 256)
-        self.conv4 = FCNConv(256, 512)
+        self.conv1 = FCNConv(num_channels, 64, layers=1)
+        self.conv2 = FCNConv(64, 128, layers=1)
+        self.conv3 = FCNConv(128, 256, layers=2)
+        self.conv4 = FCNConv(256, 512, layers=2)
         self.fconn = nn.Sequential(
             nn.Conv2d(512, 4096, 7),
             nn.ReLU(inplace=True),

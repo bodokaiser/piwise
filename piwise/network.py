@@ -52,3 +52,5 @@ class FCN8(nn.Module):
         fcon1 = F.dropout(fcon1, .5, inplace=True)
         fcon1 = F.relu(self.fcon1b(fcon1), inplace=True)
         fcon1 = F.dropout(fcon1, .5, inplace=True)
+
+        return fcon1

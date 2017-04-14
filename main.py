@@ -8,65 +8,50 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, CenterCrop, ToTensor
 
-from piwise.dataset import Voc12
-from piwise.trainer import Trainer
-from piwise.network import SimpleCNN
+from piwise.dataset import VOC12
+from piwise.network import FCN8
 from piwise.criterion import CrossEntropyLoss2d
 from piwise.transform import Relabel, ToLabel, Colorize
 from piwise.visualize import Dashboard
 
-class LossHook:
-
-    def __init__(self, interval, board=None):
-        self.board =  board
-        self.interval = interval
-
-    def __call__(self, result):
-        if result.step == 0:
-            self.loss = []
-        if result.step % self.interval == 0:
-            self.loss.append(result.loss.data[0])
-
-            if len(self.loss) > 1:
-                if self.board is not None:
-                    self.board.loss(self.loss, 'training loss')
-
-            mean = np.mean(self.loss)
-            print(f'epoch: {result.epoch}, step: {result.step}, loss: {mean}')
-
-class ImageHook:
-
-    def __init__(self, board):
-        self.board = board
-
-    def __call__(self, result):
-        colorize = Colorize()
-
-        output = result.output.cpu().max(0)[1]
-        target = result.target.cpu()
-
-        output_class = output.view(-1).median(0)[0].data[0]
-        target_class = target.view(-1).median(0)[0].data[0]
-
-        self._visualize(result, result.input, 'input')
-        self._visualize(result, colorize(output.data),
-            f'output [{output_class}]')
-        self._visualize(result, colorize(target.data),
-            f'target [{target_class}]')
-
-    def _visualize(self, result, image, name):
-        title = f'{name} (epoch: {result.epoch}, step: {result.step})'
-        self.board.image(image, title)
-
 NUM_CHANNELS = 3
 NUM_CLASSES = 22
 
+def train(args, model, loader):
+    model.train(True)
+
+    optimizer = Adam(model.parameters())
+    criterion = CrossEntropyLoss2d()
+
+    for epoch in range(1, args.num_epochs+1):
+        for step, (images, labels) in enumerate(loader):
+            if args.cuda:
+                images = images.cuda()
+                labels = labels.cuda()
+
+            inputs = Variable(images)
+            targets = Variable(labels)
+            outputs = model(inputs)
+
+            optimizer.zero_grad()
+            loss = criterion(outputs, targets[:, 0])
+            loss.backward()
+            optimizer.step()
+
+def evaluate(args, model, loader):
+    model.train(False)
+
+    for step, (images, labels) in enumerate(loader):
+        inputs = Variable(images)
+        targets = Variable(labels)
+        outputs = model(inputs)
+
+        return print(outputs)
+
 def main(args):
-    Net = SimpleCNN
+    model = FCN8(NUM_CHANNELS, NUM_CLASSES)
 
-    model = Net(NUM_CHANNELS, NUM_CLASSES)
-
-    loader = DataLoader(Voc12(args.dataroot,
+    loader = DataLoader(VOC12(args.dataroot,
         input_transform=Compose([
             CenterCrop(256),
             ToTensor(),
@@ -77,19 +62,10 @@ def main(args):
             Relabel(255, 21),
         ])), num_workers=args.num_workers, batch_size=args.batch_size)
 
-    optimizer = Adam(model.parameters())
-    criterion = CrossEntropyLoss2d()
-    trainer = Trainer(model, optimizer, criterion)
-
     if args.cuda:
         model.cuda()
-        trainer.cuda()
-    if args.visualize:
-        board = Dashboard(args.port)
 
-    trainer.plug(LossHook(args.visualize_loss_steps, board))
-    trainer.plug(ImageHook(board), args.visualize_image_steps)
-    trainer.train(loader, args.num_epochs)
+    evaluate(args, model, loader)
 
 if __name__ == '__main__':
     parser = ArgumentParser()

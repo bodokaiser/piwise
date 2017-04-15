@@ -37,23 +37,42 @@ then install requirements with `pip install -r requirements.txt`.
 
 ## Usage
 
+For latest documentation use:
+
+```
+python main.py --help
+```
+
+Supported model parameters are `fcn8`, `fcn16`, `fcn32`, `unet`, `segnet1`,
+`segnet2`, `pspnet`.
+
+### Training
+
 If you want to have visualization open an extra tab with:
 
 ```
 python -m visdom.server -port 5000
 ```
 
-Then start training:
+Train the SegNet model 30 epochs with cuda support, visualization
+and checkpoints every 100 steps:
 
 ```
-python main.py --model basic --visualize --port 5000
+python main.py --cuda --model segnet2 train --datadir data \
+    --num-epochs 30 --num-workers 4 --batch-size 4 \
+    --steps-plot 50 --steps-save 100
 ```
 
-or if you have a large CUDA card:
+### Evaluation
+
+
+Then we want to do semantic segmentation on `foo.jpg`:
 
 ```
-python main.py --model unet --cuda --visualize --port 5000
+python main.py --model segnet2 --state segnet2-30-0 eval foo.jpg foo.png
 ```
+
+The segmented class image can now be found at `foo.png`.
 
 [pyenv]: https://github.com/pyenv/pyenv
 [pytorch]: http://pytorch.org

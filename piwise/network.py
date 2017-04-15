@@ -63,6 +63,93 @@ class FCN8(nn.Module):
 
         return F.upsample_bilinear(score, x.size()[2:])
 
+
+class UNetUp(nn.Module):
+
+    def __init__(self, in_channels, features, out_channels):
+        super().__init__()
+
+        self.up = nn.Sequential(
+            nn.Conv2d(in_channels, features, 3),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(features, features, 3),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(features, out_channels, 2, stride=2),
+            nn.ReLU(inplace=True),
+        )
+
+    def forward(self, x):
+        return self.up(x)
+
+
+class UNetDown(nn.Module):
+
+    def __init__(self, in_channels, out_channels, dropout=False):
+        super().__init__()
+
+        layers = [
+            nn.Conv2d(in_channels, out_channels, 3),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, 3),
+            nn.ReLU(inplace=True),
+        ]
+        if dropout:
+            layers += [nn.Dropout(.5)]
+        layers += [nn.MaxPool2d(2, stride=2, ceil_mode=True)]
+
+        self.down = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.down(x)
+
+
+class UNetSeg(nn.Module):
+
+    def __init__(self, num_channels, num_classes):
+        super().__init__()
+
+        self.down1 = UNetDown(num_channels, 64)
+        self.down2 = UNetDown(64, 128)
+        self.down3 = UNetDown(128, 256)
+        self.down4 = UNetDown(256, 512, dropout=True)
+        self.center = nn.Sequential(
+            nn.Conv2d(512, 1024, 3),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(1024, 1024, 3),
+            nn.ReLU(inplace=True),
+            nn.Dropout(),
+            nn.ConvTranspose2d(1024, 512, 2, stride=2),
+            nn.ReLU(inplace=True),
+        )
+        self.up4 = UNetUp(1024, 512, 256)
+        self.up3 = UNetUp(512, 256, 128)
+        self.up2 = UNetUp(256, 128, 64)
+        self.up1 = nn.Sequential(
+            nn.Conv2d(128, 64, 3),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 64, 3),
+            nn.ReLU(inplace=True),
+        )
+        self.final = nn.Conv2d(64, num_classes, 1)
+
+    def forward(self, x):
+        down1 = self.down1(x)
+        down2 = self.down2(down1)
+        down3 = self.down3(down2)
+        down4 = self.down4(down3)
+        center = self.center(down4)
+        up4 = self.up4(torch.cat([
+            center, F.upsample_bilinear(down4, center.size()[2:])], 1))
+        up3 = self.up3(torch.cat([
+            up4, F.upsample_bilinear(down3, up4.size()[2:])], 1))
+        up2 = self.up2(torch.cat([
+            up3, F.upsample_bilinear(down2, up3.size()[2:])], 1))
+        up1 = self.up1(torch.cat([
+            up2, F.upsample_bilinear(down1, up2.size()[2:])], 1))
+
+        return self.final(up1)
+
+
 class BasicSegNetUp(nn.Module):
 
     def __init__(self, in_channels, out_channels):
@@ -346,7 +433,7 @@ class PSPNet(nn.Module):
             nn.BatchNorm2d(512, momentum=.95),
             nn.ReLU(inplace=True),
             nn.Dropout(.1),
-            nn.Conv2d(512, 21, 1),
+            nn.Conv2d(512, num_classes, 1),
         )
 
     def forward(self, x):

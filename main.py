@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, CenterCrop, ToTensor
 
 from piwise.dataset import VOC12
-from piwise.network import FCN8, SegNet, PSPNet
+from piwise.network import FCN8, SegNet, PSPNet, UNetSeg
 from piwise.criterion import CrossEntropyLoss2d
 from piwise.transform import Relabel, ToLabel, Colorize
 from piwise.visualize import Dashboard
@@ -49,7 +49,7 @@ def evaluate(args, model, loader):
         return outputs
 
 def main(args):
-    model = PSPNet(NUM_CHANNELS, NUM_CLASSES)
+    model = UNetSeg(NUM_CHANNELS, NUM_CLASSES)
 
     loader = DataLoader(VOC12(args.dataroot,
         input_transform=Compose([

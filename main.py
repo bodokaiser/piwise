@@ -3,6 +3,7 @@ import numpy as np
 from PIL import Image
 from argparse import ArgumentParser
 
+from torch.nn import DataParallel
 from torch.optim import Adam
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
@@ -63,7 +64,7 @@ def main(args):
         ])), num_workers=args.num_workers, batch_size=args.batch_size)
 
     if args.cuda:
-        model.cuda()
+        model = DataParallel(model).cuda()
 
     print(evaluate(args, model, loader).size())
 

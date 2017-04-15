@@ -30,7 +30,7 @@ target_transform = Compose([
     Relabel(255, 21),
 ])
 
-def train(args, model, loader):
+def train(args, model):
     model.train(True)
 
     if args.cuda:
@@ -57,6 +57,9 @@ def train(args, model, loader):
             loss.backward()
             optimizer.step()
 
+            if step % args.steps_loss == 0:
+                print(f'epoch: {epoch}, step: {step}, loss: {loss.data[0]}')
+
 def evaluate(args, model):
     model.train(False)
 
@@ -65,7 +68,7 @@ def evaluate(args, model):
 
     image_transform(label).save(args.label)
 
-def main(args, parser):
+def main(args):
     Net = None
     if args.model == 'fcn8':
         Net = FCN8
@@ -88,16 +91,17 @@ def main(args, parser):
     model = Net(NUM_CHANNELS, NUM_CLASSES)
 
     if args.mode == 'eval':
-        return evaluate(args, model)
+        evaluate(args, model)
     if args.mode == 'train':
-        return train(args, model)
-    parser.print_help()
+        train(args, model)
 
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--cuda', action='store_true')
     parser.add_argument('--model', required=True)
+
     subparsers = parser.add_subparsers(dest='mode')
+    subparsers.required = True
 
     parser_eval = subparsers.add_parser('eval')
     parser_eval.add_argument('image')
@@ -108,5 +112,6 @@ if __name__ == '__main__':
     parser_train.add_argument('--num-epochs', type=int, default=32)
     parser_train.add_argument('--num-workers', type=int, default=4)
     parser_train.add_argument('--batch-size', type=int, default=1)
+    parser_train.add_argument('--steps-loss', type=int, default=50)
 
-    main(parser.parse_args(), parser)
+    main(parser.parse_args())

@@ -24,8 +24,7 @@ class FCNConv(nn.Module):
     def forward(self, x):
         return self.conv(x)
 
-
-class FCN8(nn.Module):
+class FCNBase(nn.Module):
 
     def __init__(self, num_channels, num_classes):
         super().__init__()
@@ -42,10 +41,16 @@ class FCN8(nn.Module):
             nn.ReLU(inplace=True),
             nn.Dropout(inplace=True),
         )
+        self.score_fconn = nn.Conv2d(4096, num_classes, 1)
 
-        self.score1 = nn.Conv2d(256, num_classes, 1)
-        self.score2 = nn.Conv2d(512, num_classes, 1)
-        self.score3 = nn.Conv2d(4096, num_classes, 1)
+
+class FCN8(FCNBase):
+
+    def __init__(self, num_channels, num_classes):
+        super().__init__(num_channels, num_classes)
+
+        self.score_conv3 = nn.Conv2d(256, num_classes, 1)
+        self.score_conv4 = nn.Conv2d(512, num_classes, 1)
 
     def forward(self, x):
         conv1 = self.conv1(x)
@@ -54,12 +59,49 @@ class FCN8(nn.Module):
         conv4 = self.conv4(conv3)
         fconn = self.fconn(conv4)
 
-        score1 = self.score1(conv3)
-        score2 = self.score2(conv4)
-        score3 = self.score3(fconn)
+        score_conv3 = self.score_conv3(conv3)
+        score_conv4 = self.score_conv4(conv4)
+        score_fconn = self.score_fconn(fconn)
 
-        score = F.upsample_bilinear(score3, score2.size()[2:]) + score2
-        score = F.upsample_bilinear(score, score1.size()[2:]) + score1
+        score = F.upsample_bilinear(score_fconn, score_conv4.size()[2:])
+        score += score_conv4
+        score = F.upsample_bilinear(score, score_conv3.size()[2:])
+        score += score_conv3
+
+        return F.upsample_bilinear(score, x.size()[2:])
+
+class FCN16(FCNBase):
+
+    def __init__(self, num_channels, num_classes):
+        super().__init__(num_channels, num_classes)
+
+        self.score_conv4 = nn.Conv2d(512, num_classes, 1)
+
+    def forward(self, x):
+        conv1 = self.conv1(x)
+        conv2 = self.conv2(conv1)
+        conv3 = self.conv3(conv2)
+        conv4 = self.conv4(conv3)
+        fconn = self.fconn(conv4)
+
+        score_conv4 = self.score_conv4(conv4)
+        score_fconn = self.score_fconn(fconn)
+
+        score = F.upsample_bilinear(score_fconn, score_conv4.size()[2:])
+        score += score_conv4
+
+        return F.upsample_bilinear(score, x.size()[2:])
+
+
+class FCN32(FCNBase):
+
+    def forward(self, x):
+        conv1 = self.conv1(x)
+        conv2 = self.conv2(conv1)
+        conv3 = self.conv3(conv2)
+        conv4 = self.conv4(conv3)
+        fconn = self.fconn(conv4)
+        score = self.score_fconn(fconn)
 
         return F.upsample_bilinear(score, x.size()[2:])
 

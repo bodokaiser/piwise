@@ -34,8 +34,6 @@ target_transform = Compose([
 def train(args, model):
     model.train(True)
 
-    if args.cuda:
-        model = DataParallel(model).cuda()
     if args.steps_plot > 0:
         board = Dashboard(args.port)
 
@@ -112,9 +110,10 @@ def main(args):
 
     model = Net(NUM_CHANNELS, NUM_CLASSES)
 
+    if args.cuda:
+        model = DataParallel(model).cuda()
     if args.state:
         model.load_state_dict(torch.load(args.state))
-        print(f'loaded checkpoint state from {args.state}')
 
     if args.mode == 'eval':
         evaluate(args, model)

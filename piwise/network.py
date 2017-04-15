@@ -36,10 +36,10 @@ class FCNBase(nn.Module):
         self.fconn = nn.Sequential(
             nn.Conv2d(512, 4096, 7),
             nn.ReLU(inplace=True),
-            nn.Dropout(inplace=True),
+            nn.Dropout(),
             nn.Conv2d(4096, 4096, 1),
             nn.ReLU(inplace=True),
-            nn.Dropout(inplace=True),
+            nn.Dropout(),
         )
         self.score_fconn = nn.Conv2d(4096, num_classes, 1)
 

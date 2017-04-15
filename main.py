@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 from PIL import Image
 from argparse import ArgumentParser
@@ -57,8 +58,12 @@ def train(args, model):
             loss.backward()
             optimizer.step()
 
-            if step % args.steps_loss == 0:
-                print(f'epoch: {epoch}, step: {step}, loss: {loss.data[0]}')
+            if args.steps_loss > 0 and step % args.steps_loss == 0:
+                print(f'loss: {loss.data[0]} (epoch: {epoch}, step: {step})')
+            if args.steps_save > 0 and step % args.steps_save == 0:
+                filename = f'{args.model}-{epoch:03}-{step:04}.ckpt'
+                torch.save(model.state_dict(), filename)
+                print(f'save: {filename} (epoch: {epoch}, step: {step})')
 
 def evaluate(args, model):
     model.train(False)
@@ -90,6 +95,10 @@ def main(args):
 
     model = Net(NUM_CHANNELS, NUM_CLASSES)
 
+    if args.state:
+        model.load_state_dict(torch.load(args.state))
+        print(f'loaded checkpoint state from {args.state}')
+
     if args.mode == 'eval':
         evaluate(args, model)
     if args.mode == 'train':
@@ -99,6 +108,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--cuda', action='store_true')
     parser.add_argument('--model', required=True)
+    parser.add_argument('--state')
 
     subparsers = parser.add_subparsers(dest='mode')
     subparsers.required = True
@@ -113,5 +123,6 @@ if __name__ == '__main__':
     parser_train.add_argument('--num-workers', type=int, default=4)
     parser_train.add_argument('--batch-size', type=int, default=1)
     parser_train.add_argument('--steps-loss', type=int, default=50)
+    parser_train.add_argument('--steps-save', type=int, default=100)
 
     main(parser.parse_args())

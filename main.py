@@ -7,7 +7,7 @@ from torch.nn import DataParallel
 from torch.optim import Adam
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
-from torchvision.transforms import Compose, CenterCrop, ToTensor
+from torchvision.transforms import Compose, CenterCrop, ToTensor, ToPILImage
 
 from piwise.dataset import VOC12
 from piwise.network import FCN8, FCN16, FCN32, UNet, PSPNet, SegNet1, SegNet2
@@ -18,8 +18,26 @@ from piwise.visualize import Dashboard
 NUM_CHANNELS = 3
 NUM_CLASSES = 22
 
+color_transform = Colorize()
+image_transform = ToPILImage()
+input_transform = Compose([
+    CenterCrop(256),
+    ToTensor(),
+])
+target_transform = Compose([
+    CenterCrop(256),
+    ToLabel(),
+    Relabel(255, 21),
+])
+
 def train(args, model, loader):
     model.train(True)
+
+    if args.cuda:
+        model = DataParallel(model).cuda()
+
+    loader = DataLoader(VOC12(args.datadir, input_transform, target_transform),
+        num_workers=args.num_workers, batch_size=args.batch_size)
 
     optimizer = Adam(model.parameters())
     criterion = CrossEntropyLoss2d()
@@ -39,19 +57,16 @@ def train(args, model, loader):
             loss.backward()
             optimizer.step()
 
-def evaluate(args, model, loader):
+def evaluate(args, model):
     model.train(False)
 
-    for step, (images, labels) in enumerate(loader):
-        inputs = Variable(images)
-        targets = Variable(labels)
-        outputs = model(inputs)
+    image = input_transform(Image.open(args.image))
+    label = color_transform(model(Variable(image).unsqueeze(0))[0].data.max(0)[1])
 
-        return outputs
+    image_transform(label).save(args.label)
 
-def main(args):
+def main(args, parser):
     Net = None
-
     if args.model == 'fcn8':
         Net = FCN8
     if args.model == 'fcn16':
@@ -72,32 +87,26 @@ def main(args):
 
     model = Net(NUM_CHANNELS, NUM_CLASSES)
 
-    loader = DataLoader(VOC12(args.dataroot,
-        input_transform=Compose([
-            CenterCrop(256),
-            ToTensor(),
-        ]),
-        target_transform=Compose([
-            CenterCrop(256),
-            ToLabel(),
-            Relabel(255, 21),
-        ])), num_workers=args.num_workers, batch_size=args.batch_size)
-
-    if args.cuda:
-        model = DataParallel(model).cuda()
-
-    print(evaluate(args, model, loader).size())
+    if args.mode == 'eval':
+        return evaluate(args, model)
+    if args.mode == 'train':
+        return train(args, model)
+    parser.print_help()
 
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--cuda', action='store_true')
     parser.add_argument('--model', required=True)
-    parser.add_argument('--visualize', choices=['dashboard'])
-    parser.add_argument('--visualize-loss-steps', type=int, default=50)
-    parser.add_argument('--visualize-image-steps', type=int, default=50)
-    parser.add_argument('--num-epochs', type=int, default=32)
-    parser.add_argument('--num-workers', type=int, default=4)
-    parser.add_argument('--batch-size', type=int, default=1)
-    parser.add_argument('--dataroot', nargs='?', default='data')
-    parser.add_argument('--port', type=int, default=80)
-    main(parser.parse_args())
+    subparsers = parser.add_subparsers(dest='mode')
+
+    parser_eval = subparsers.add_parser('eval')
+    parser_eval.add_argument('image')
+    parser_eval.add_argument('label')
+
+    parser_train = subparsers.add_parser('train')
+    parser_train.add_argument('--datadir', required=True)
+    parser_train.add_argument('--num-epochs', type=int, default=32)
+    parser_train.add_argument('--num-workers', type=int, default=4)
+    parser_train.add_argument('--batch-size', type=int, default=1)
+
+    main(parser.parse_args(), parser)

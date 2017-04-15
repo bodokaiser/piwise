@@ -36,6 +36,8 @@ def train(args, model):
 
     if args.cuda:
         model = DataParallel(model).cuda()
+    if args.steps_plot > 0:
+        board = Dashboard(args.port)
 
     loader = DataLoader(VOC12(args.datadir, input_transform, target_transform),
         num_workers=args.num_workers, batch_size=args.batch_size)
@@ -44,6 +46,8 @@ def train(args, model):
     criterion = CrossEntropyLoss2d()
 
     for epoch in range(1, args.num_epochs+1):
+        epoch_loss = []
+
         for step, (images, labels) in enumerate(loader):
             if args.cuda:
                 images = images.cuda()
@@ -58,12 +62,25 @@ def train(args, model):
             loss.backward()
             optimizer.step()
 
+            epoch_loss.append(loss.data[0])
+            if args.steps_plot > 0 and step % args.steps_plot == 0:
+                board.image(inputs[0].cpu().data,
+                    f'input (epoch: {epoch}, step: {step})')
+                board.image(color_transform(outputs[0].cpu().max(0)[1].data),
+                    f'output (epoch: {epoch}, step: {step})')
+                board.image(color_transform(targets[0].cpu().data),
+                    f'target (epoch: {epoch}, step: {step})')
             if args.steps_loss > 0 and step % args.steps_loss == 0:
-                print(f'loss: {loss.data[0]} (epoch: {epoch}, step: {step})')
+                average = sum(epoch_loss) / len(epoch_loss)
+                print(f'loss: {average} (epoch: {epoch}, step: {step})')
             if args.steps_save > 0 and step % args.steps_save == 0:
                 filename = f'{args.model}-{epoch:03}-{step:04}.ckpt'
                 torch.save(model.state_dict(), filename)
                 print(f'save: {filename} (epoch: {epoch}, step: {step})')
+
+        if args.steps_plot > 0:
+            board.loss(epoch_loss, 'training loss')
+        print(f'loss: {sum(epoch_loss)} (epoch: {epoch})')
 
 def evaluate(args, model):
     model.train(False)
@@ -118,11 +135,13 @@ if __name__ == '__main__':
     parser_eval.add_argument('label')
 
     parser_train = subparsers.add_parser('train')
+    parser_train.add_argument('--port', type=int, default=80)
     parser_train.add_argument('--datadir', required=True)
     parser_train.add_argument('--num-epochs', type=int, default=32)
     parser_train.add_argument('--num-workers', type=int, default=4)
     parser_train.add_argument('--batch-size', type=int, default=1)
     parser_train.add_argument('--steps-loss', type=int, default=50)
+    parser_train.add_argument('--steps-plot', type=int, default=0)
     parser_train.add_argument('--steps-save', type=int, default=100)
 
     main(parser.parse_args())

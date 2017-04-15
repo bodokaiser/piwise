@@ -8,16 +8,11 @@ class Dashboard:
 
     def __init__(self, port):
         self.vis = Visdom(port=port)
-        self.win = None
 
     def loss(self, losses, title):
         x = np.arange(1, len(losses)+1, 1)
 
-        win = self.vis.line(losses, x, win=self.win, env='loss',
-            opts=dict(title=title))
-
-        if self.win is None:
-            self.win = win
+        self.vis.line(losses, x, env='loss', opts=dict(title=title))
 
     def image(self, image, title):
         if image.is_cuda:

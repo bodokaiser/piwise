@@ -6,6 +6,7 @@ Pixel-wise segmentation on the [VOC2012][dataset] dataset using
 - [x] [FCN8](https://arxiv.org/abs/1605.06211)
 - [x] [SegNet](https://arxiv.org/abs/1511.00561)
 - [x] [PSPNet](https://arxiv.org/abs/1612.01105)
+- [ ] [UNet](https://arxiv.org/abs/1505.04597)
 - [ ] [RefineNet](https://arxiv.org/abs/1611.06612)
 
 ## Setup

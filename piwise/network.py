@@ -145,7 +145,7 @@ class UNetDown(nn.Module):
         return self.down(x)
 
 
-class UNetSeg(nn.Module):
+class UNet(nn.Module):
 
     def __init__(self, num_channels, num_classes):
         super().__init__()
@@ -189,10 +189,10 @@ class UNetSeg(nn.Module):
         up1 = self.up1(torch.cat([
             up2, F.upsample_bilinear(down1, up2.size()[2:])], 1))
 
-        return self.final(up1)
+        return F.upsample_bilinear(self.final(up1), x.size()[2:])
 
 
-class BasicSegNetUp(nn.Module):
+class SegNet1Up(nn.Module):
 
     def __init__(self, in_channels, out_channels):
         super().__init__()
@@ -207,7 +207,7 @@ class BasicSegNetUp(nn.Module):
         return self.up(x)
 
 
-class BasicSegNetDown(nn.Module):
+class SegNet1Down(nn.Module):
 
     def __init__(self, in_channels, out_channels):
         super().__init__()
@@ -223,19 +223,19 @@ class BasicSegNetDown(nn.Module):
         return self.down(x)
 
 
-class BasicSegNet(nn.Module):
+class SegNet1(nn.Module):
 
     def __init__(self, num_channels, num_classes):
         super().__init__()
 
-        self.down1 = BasicSegNetDown(num_channels, 64)
-        self.down2 = BasicSegNetDown(64, 64)
-        self.down3 = BasicSegNetDown(64, 64)
-        self.down4 = BasicSegNetDown(64, 64)
-        self.up4 = BasicSegNetUp(64, 64)
-        self.up3 = BasicSegNetUp(128, 64)
-        self.up2 = BasicSegNetUp(128, 64)
-        self.up1 = BasicSegNetUp(128, 64)
+        self.down1 = SegNet1Down(num_channels, 64)
+        self.down2 = SegNet1Down(64, 64)
+        self.down3 = SegNet1Down(64, 64)
+        self.down4 = SegNet1Down(64, 64)
+        self.up4 = SegNet1Up(64, 64)
+        self.up3 = SegNet1Up(128, 64)
+        self.up2 = SegNet1Up(128, 64)
+        self.up1 = SegNet1Up(128, 64)
         self.final = nn.Conv2d(64, num_classes, 1)
 
     def forward(self, x):
@@ -251,7 +251,7 @@ class BasicSegNet(nn.Module):
         return self.final(up1)
 
 
-class SegNetUp(nn.Module):
+class SegNet2Up(nn.Module):
 
     def __init__(self, in_channels, out_channels, layers):
         super().__init__()
@@ -278,7 +278,7 @@ class SegNetUp(nn.Module):
         return self.up(x)
 
 
-class SegNetDown(nn.Module):
+class SegNet2Down(nn.Module):
 
     def __init__(self, in_channels, out_channels, layers):
         super().__init__()
@@ -302,20 +302,20 @@ class SegNetDown(nn.Module):
         return self.down(x)
 
 
-class SegNet(nn.Module):
+class SegNet2(nn.Module):
 
     def __init__(self, num_channels, num_classes):
         super().__init__()
 
-        self.down1 = SegNetDown(num_channels, 64, layers=1)
-        self.down2 = SegNetDown(64, 128, layers=1)
-        self.down3 = SegNetDown(128, 256, layers=2)
-        self.down4 = SegNetDown(256, 512, layers=2)
-        self.down5 = SegNetDown(512, 512, layers=2)
-        self.up5 = SegNetUp(512, 512, layers=1)
-        self.up4 = SegNetUp(1024, 256, layers=1)
-        self.up3 = SegNetUp(512, 128, layers=1)
-        self.up2 = SegNetUp(256, 64, layers=0)
+        self.down1 = SegNet2Down(num_channels, 64, layers=1)
+        self.down2 = SegNet2Down(64, 128, layers=1)
+        self.down3 = SegNet2Down(128, 256, layers=2)
+        self.down4 = SegNet2Down(256, 512, layers=2)
+        self.down5 = SegNet2Down(512, 512, layers=2)
+        self.up5 = SegNet2Up(512, 512, layers=1)
+        self.up4 = SegNet2Up(1024, 256, layers=1)
+        self.up3 = SegNet2Up(512, 128, layers=1)
+        self.up2 = SegNet2Up(256, 64, layers=0)
         self.up1 = nn.Sequential(
             nn.UpsamplingBilinear2d(scale_factor=2),
             nn.Conv2d(128, 64, 3, padding=1),

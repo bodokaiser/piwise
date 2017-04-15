@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, CenterCrop, ToTensor
 
 from piwise.dataset import VOC12
-from piwise.network import FCN8, FCN16, FCN32, SegNet, PSPNet, UNetSeg
+from piwise.network import FCN8, FCN16, FCN32, UNet, PSPNet, SegNet1, SegNet2
 from piwise.criterion import CrossEntropyLoss2d
 from piwise.transform import Relabel, ToLabel, Colorize
 from piwise.visualize import Dashboard
@@ -50,7 +50,27 @@ def evaluate(args, model, loader):
         return outputs
 
 def main(args):
-    model = FCN8(NUM_CHANNELS, NUM_CLASSES)
+    Net = None
+
+    if args.model == 'fcn8':
+        Net = FCN8
+    if args.model == 'fcn16':
+        Net = FCN16
+    if args.model == 'fcn32':
+        Net = FCN32
+    if args.model == 'fcn32':
+        Net = FCN32
+    if args.model == 'unet':
+        Net = UNet
+    if args.model == 'pspnet':
+        Net = PSPNet
+    if args.model == 'segnet1':
+        Net = SegNet1
+    if args.model == 'segnet2':
+        Net = SegNet2
+    assert Net is not None, f'model {args.model} not available'
+
+    model = Net(NUM_CHANNELS, NUM_CLASSES)
 
     loader = DataLoader(VOC12(args.dataroot,
         input_transform=Compose([
@@ -70,9 +90,8 @@ def main(args):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('--port', type=int, default=80)
     parser.add_argument('--cuda', action='store_true')
-    parser.add_argument('--model', choices=['simple'])
+    parser.add_argument('--model', required=True)
     parser.add_argument('--visualize', choices=['dashboard'])
     parser.add_argument('--visualize-loss-steps', type=int, default=50)
     parser.add_argument('--visualize-image-steps', type=int, default=50)
@@ -80,4 +99,5 @@ if __name__ == '__main__':
     parser.add_argument('--num-workers', type=int, default=4)
     parser.add_argument('--batch-size', type=int, default=1)
     parser.add_argument('--dataroot', nargs='?', default='data')
+    parser.add_argument('--port', type=int, default=80)
     main(parser.parse_args())

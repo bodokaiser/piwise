@@ -344,51 +344,21 @@ class SegNet2(nn.Module):
         return self.final(up1)
 
 
-class PSPConv(nn.Module):
+class PSPPool(nn.Module):
 
-    def __init__(self, in_channels, features, out_channels):
+    def __init__(self, in_features, out_features, downsize, upsize=60):
         super().__init__()
 
-        self.conv = nn.Sequential(
-            nn.Conv2d(in_channels, features, 1, bias=False),
-            nn.BatchNorm2d(features, momentum=.95),
+        self.pool = nn.Sequential(
+            nn.AvgPool2d(downsize, stride=downsize),
+            nn.Conv2d(in_features, out_features, 1, bias=False),
+            nn.BatchNorm2d(out_features, momentum=.95),
             nn.ReLU(inplace=True),
-            nn.Conv2d(features, features, 3, padding=1, bias=False),
-            nn.BatchNorm2d(features, momentum=.95),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(features, out_channels, 1, bias=False),
-            nn.BatchNorm2d(out_channels, momentum=.95),
+            nn.UpsamplingBilinear2d(upsize)
         )
 
     def forward(self, x):
-        return self.conv(x)
-
-
-class PSPCross(nn.Module):
-
-    def __init__(self, in_channels, features, out_channels):
-        super().__init__()
-
-        self.crossa = nn.Sequential(
-            nn.Conv2d(in_channels, features, 1, bias=False),
-            nn.BatchNorm2d(features, momentum=.95),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(features, features, 3, padding=1, bias=False),
-            nn.BatchNorm2d(features, momentum=.95),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(features, out_channels, 1, bias=False),
-            nn.BatchNorm2d(out_channels, momentum=.95),
-        )
-        self.crossb = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, 1, bias=False),
-            nn.BatchNorm2d(out_channels, momentum=.95),
-        )
-
-    def forward(self, x):
-        crossa = self.crossa(x)
-        crossb = self.crossb(x)
-
-        return F.relu(crossa + crossb, inplace=True)
+        return self.pool(x)
 
 
 class PSPNet(nn.Module):
@@ -396,7 +366,7 @@ class PSPNet(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
 
-        self.layer1 = nn.Sequential(
+        self.conv1 = nn.Sequential(
             nn.Conv2d(3, 64, 3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(64, momentum=.95),
             nn.ReLU(inplace=True),
@@ -409,71 +379,17 @@ class PSPNet(nn.Module):
             nn.MaxPool2d(3, stride=2, padding=1),
         )
 
-        self.layer2 = PSPCross(128, 64, 256)
-        self.layer2a = PSPConv(256, 64, 256)
-        self.layer2b = PSPConv(256, 64, 256)
+        resnet = models.resnet101(pretrained=True)
 
-        self.layer3 = PSPCross(256, 128, 512)
-        self.layer3a = PSPConv(512, 128, 512)
-        self.layer3b = PSPConv(512, 128, 512)
-        self.layer3c = PSPConv(512, 128, 512)
+        self.layer1 = resnet.layer1
+        self.layer2 = resnet.layer2
+        self.layer3 = resnet.layer3
+        self.layer4 = resnet.layer4
 
-        self.layer4 = PSPCross(512, 256, 1024)
-        self.layer4a = PSPConv(1024, 256, 1024)
-        self.layer4b = PSPConv(1024, 256, 1024)
-        self.layer4c = PSPConv(1024, 256, 1024)
-        self.layer4d = PSPConv(1024, 256, 1024)
-        self.layer4e = PSPConv(1024, 256, 1024)
-        self.layer4f = PSPConv(1024, 256, 1024)
-        self.layer4g = PSPConv(1024, 256, 1024)
-        self.layer4h = PSPConv(1024, 256, 1024)
-        self.layer4i = PSPConv(1024, 256, 1024)
-        self.layer4j = PSPConv(1024, 256, 1024)
-        self.layer4k = PSPConv(1024, 256, 1024)
-        self.layer4l = PSPConv(1024, 256, 1024)
-        self.layer4m = PSPConv(1024, 256, 1024)
-        self.layer4n = PSPConv(1024, 256, 1024)
-        self.layer4o = PSPConv(1024, 256, 1024)
-        self.layer4p = PSPConv(1024, 256, 1024)
-        self.layer4q = PSPConv(1024, 256, 1024)
-        self.layer4r = PSPConv(1024, 256, 1024)
-        self.layer4s = PSPConv(1024, 256, 1024)
-        self.layer4t = PSPConv(1024, 256, 1024)
-        self.layer4u = PSPConv(1024, 256, 1024)
-        self.layer4v = PSPConv(1024, 256, 1024)
-
-        self.layer5 = PSPCross(1024, 512, 2048)
-        self.layer5a = PSPConv(2048, 512, 2048)
-        self.layer5b = PSPConv(2048, 512, 2048)
-
-        self.layer6a = nn.Sequential(
-            nn.AvgPool2d(60, stride=60),
-            nn.Conv2d(2048, 512, 1, bias=False),
-            nn.BatchNorm2d(512, momentum=.95),
-            nn.ReLU(inplace=True),
-            nn.UpsamplingBilinear2d((60, 60))
-        )
-        self.layer6b = nn.Sequential(
-            nn.AvgPool2d(60, stride=60),
-            nn.Conv2d(2048, 512, 1, bias=False),
-            nn.BatchNorm2d(512, momentum=.95),
-            nn.ReLU(inplace=True),
-            nn.UpsamplingBilinear2d((60, 60))
-        )
-        self.layer6c = nn.Sequential(
-            nn.AvgPool2d(60, stride=60),
-            nn.Conv2d(2048, 512, 1, bias=False),
-            nn.BatchNorm2d(512, momentum=.95),
-            nn.ReLU(inplace=True),
-            nn.UpsamplingBilinear2d((60, 60))
-        )
-        self.layer6d = nn.Sequential(
-            nn.AvgPool2d(60, stride=60),
-            nn.Conv2d(2048, 512, 1, bias=False),
-            nn.BatchNorm2d(512, momentum=.95),
-            nn.ReLU(inplace=True),
-            nn.UpsamplingBilinear2d((60, 60))
-        )
+        self.layer5a = PSPPool(2048, 512, 60)
+        self.layer5b = PSPPool(2048, 512, 30)
+        self.layer5c = PSPPool(2048, 512, 20)
+        self.layer5d = PSPPool(2048, 512, 10)
 
         self.final = nn.Sequential(
             nn.Conv2d(2048, 512, 3, padding=1, bias=False),
@@ -484,50 +400,17 @@ class PSPNet(nn.Module):
         )
 
     def forward(self, x):
-        layer1 = self.layer1(x)
-
-        layer2 = self.layer2(layer1)
-        layer2a = F.relu(self.layer2a(layer2) + layer2, inplace=True)
-        layer2b = F.relu(self.layer2b(layer2a) + layer2a, inplace=True)
-
-        layer3 = self.layer3(layer2b)
-        layer3a = F.relu(self.layer3a(layer3) + layer3, inplace=True)
-        layer3b = F.relu(self.layer3b(layer3a) + layer3a, inplace=True)
-        layer3c = F.relu(self.layer3c(layer3b) + layer3b, inplace=True)
-
-        layer4 = self.layer4(layer3c)
-        layer4a = F.relu(self.layer4a(layer4) + layer4, inplace=True)
-        layer4b = F.relu(self.layer4b(layer4a) + layer4a, inplace=True)
-        layer4c = F.relu(self.layer4c(layer4b) + layer4b, inplace=True)
-        layer4d = F.relu(self.layer4d(layer4c) + layer4c, inplace=True)
-        layer4e = F.relu(self.layer4e(layer4d) + layer4d, inplace=True)
-        layer4f = F.relu(self.layer4f(layer4e) + layer4e, inplace=True)
-        layer4g = F.relu(self.layer4g(layer4f) + layer4f, inplace=True)
-        layer4h = F.relu(self.layer4h(layer4g) + layer4g, inplace=True)
-        layer4i = F.relu(self.layer4i(layer4h) + layer4h, inplace=True)
-        layer4j = F.relu(self.layer4j(layer4i) + layer4i, inplace=True)
-        layer4k = F.relu(self.layer4k(layer4j) + layer4j, inplace=True)
-        layer4l = F.relu(self.layer4l(layer4k) + layer4k, inplace=True)
-        layer4m = F.relu(self.layer4m(layer4l) + layer4l, inplace=True)
-        layer4n = F.relu(self.layer4n(layer4m) + layer4m, inplace=True)
-        layer4o = F.relu(self.layer4o(layer4n) + layer4n, inplace=True)
-        layer4p = F.relu(self.layer4p(layer4o) + layer4o, inplace=True)
-        layer4q = F.relu(self.layer4q(layer4p) + layer4p, inplace=True)
-        layer4r = F.relu(self.layer4r(layer4q) + layer4q, inplace=True)
-        layer4s = F.relu(self.layer4s(layer4r) + layer4r, inplace=True)
-        layer4t = F.relu(self.layer4t(layer4s) + layer4s, inplace=True)
-        layer4u = F.relu(self.layer4u(layer4t) + layer4t, inplace=True)
-        layer4v = F.relu(self.layer4v(layer4u) + layer4u, inplace=True)
-
-        layer5 = self.layer5(layer4v)
-        layer5a = F.relu(self.layer5a(layer5) + layer5, inplace=True)
-        layer5b = F.relu(self.layer5b(layer5a) + layer5a, inplace=True)
-
-        final = self.final(torch.cat([
-            self.layer6a(layer5b),
-            self.layer6b(layer5b),
-            self.layer6c(layer5b),
-            self.layer6d(layer5b),
+        x = self.conv1(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        x = self.layer5(x)
+        x = self.final(torch.cat([
+            self.layer5a(x),
+            self.layer5b(x),
+            self.layer5c(x),
+            self.layer5d(x),
         ], 1))
 
         return F.upsample_bilinear(final, x.size()[2:])

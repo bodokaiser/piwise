@@ -3,36 +3,21 @@ import torch.nn as nn
 import torch.nn.init as init
 import torch.nn.functional as F
 
-class FCNConv(nn.Module):
+from torchvision import models
+from torchvision.transforms import Normalize
 
-    def __init__(self, in_channels, out_channels, layers):
+class FCN(nn.Module):
+
+    def __init__(self, num_classes):
         super().__init__()
 
-        conv = [
-            nn.Conv2d(in_channels, out_channels, 3, padding=1),
-            nn.ReLU(inplace=True),
-        ]
-        conv += [
-            nn.Conv2d(out_channels, out_channels, 3, padding=1),
-            nn.ReLU(inplace=True),
-        ] * layers
-        conv += [
-            nn.MaxPool2d(2, stride=2, ceil_mode=True),
-        ]
-        self.conv = nn.Sequential(*conv)
+        feat = list(models.vgg16(pretrained=True).features.children())
 
-    def forward(self, x):
-        return self.conv(x)
-
-class FCNBase(nn.Module):
-
-    def __init__(self, num_channels, num_classes):
-        super().__init__()
-
-        self.conv1 = FCNConv(num_channels, 64, layers=1)
-        self.conv2 = FCNConv(64, 128, layers=1)
-        self.conv3 = FCNConv(128, 256, layers=2)
-        self.conv4 = FCNConv(256, 512, layers=2)
+        self.feat1 = nn.Sequential(*feat[0:4])
+        self.feat2 = nn.Sequential(*feat[5:9])
+        self.feat3 = nn.Sequential(*feat[10:16])
+        self.feat4 = nn.Sequential(*feat[17:23])
+        self.feat5 = nn.Sequential(*feat[24:30])
         self.fconn = nn.Sequential(
             nn.Conv2d(512, 4096, 7),
             nn.ReLU(inplace=True),
@@ -42,65 +27,73 @@ class FCNBase(nn.Module):
             nn.Dropout(),
         )
         self.score_fconn = nn.Conv2d(4096, num_classes, 1)
+        self.normalize = Normalize([.485, .456, .406], [.229, .224, .225])
 
-
-class FCN8(FCNBase):
-
-    def __init__(self, num_channels, num_classes):
-        super().__init__(num_channels, num_classes)
-
-        self.score_conv3 = nn.Conv2d(256, num_classes, 1)
-        self.score_conv4 = nn.Conv2d(512, num_classes, 1)
 
     def forward(self, x):
-        conv1 = self.conv1(x)
-        conv2 = self.conv2(conv1)
-        conv3 = self.conv3(conv2)
-        conv4 = self.conv4(conv3)
-        fconn = self.fconn(conv4)
+        x = self.normalize(x)
+        x = self.feat1(x)
+        x = self.feat2(x)
+        x = self.feat3(x)
 
-        score_conv3 = self.score_conv3(conv3)
-        score_conv4 = self.score_conv4(conv4)
+        return x
+
+
+class FCN8(FCN):
+
+    def __init__(self, num_classes):
+        super().__init__(num_classes)
+
+        self.score_feat3 = nn.Conv2d(256, num_classes, 1)
+        self.score_feat4 = nn.Conv2d(512, num_classes, 1)
+
+    def forward(self, x):
+        feat3 = super().forward(x)
+        feat4 = self.feat4(feat3)
+        feat5 = self.feat5(feat4)
+        fconn = self.fconn(feat5)
+
+        score_feat3 = self.score_feat3(feat3)
+        score_feat4 = self.score_feat4(feat4)
         score_fconn = self.score_fconn(fconn)
 
-        score = F.upsample_bilinear(score_fconn, score_conv4.size()[2:])
-        score += score_conv4
-        score = F.upsample_bilinear(score, score_conv3.size()[2:])
-        score += score_conv3
+        score = F.upsample_bilinear(score_fconn, score_feat4.size()[2:])
+        score += score_feat4
+        score = F.upsample_bilinear(score, score_feat3.size()[2:])
+        score += score_feat3
 
         return F.upsample_bilinear(score, x.size()[2:])
 
-class FCN16(FCNBase):
+class FCN16(FCN):
 
-    def __init__(self, num_channels, num_classes):
-        super().__init__(num_channels, num_classes)
+    def __init__(self, num_classes):
+        super().__init__(num_classes)
 
-        self.score_conv4 = nn.Conv2d(512, num_classes, 1)
+        self.score_feat4 = nn.Conv2d(512, num_classes, 1)
 
     def forward(self, x):
-        conv1 = self.conv1(x)
-        conv2 = self.conv2(conv1)
-        conv3 = self.conv3(conv2)
-        conv4 = self.conv4(conv3)
-        fconn = self.fconn(conv4)
+        feat3 = super().forward(x)
+        feat4 = self.feat4(feat3)
+        feat5 = self.feat5(feat4)
+        fconn = self.fconn(feat5)
 
-        score_conv4 = self.score_conv4(conv4)
+        score_feat4 = self.score_feat4(feat4)
         score_fconn = self.score_fconn(fconn)
 
-        score = F.upsample_bilinear(score_fconn, score_conv4.size()[2:])
-        score += score_conv4
+        score = F.upsample_bilinear(score_fconn, score_feat4.size()[2:])
+        score += score_feat4
 
         return F.upsample_bilinear(score, x.size()[2:])
 
 
-class FCN32(FCNBase):
+class FCN32(FCN):
 
     def forward(self, x):
-        conv1 = self.conv1(x)
-        conv2 = self.conv2(conv1)
-        conv3 = self.conv3(conv2)
-        conv4 = self.conv4(conv3)
-        fconn = self.fconn(conv4)
+        feat3 = super().forward(x)
+        feat4 = self.feat4(feat3)
+        feat5 = self.feat5(feat4)
+        fconn = self.fconn(feat5)
+
         score = self.score_fconn(fconn)
 
         return F.upsample_bilinear(score, x.size()[2:])
@@ -147,10 +140,10 @@ class UNetDown(nn.Module):
 
 class UNet(nn.Module):
 
-    def __init__(self, num_channels, num_classes):
+    def __init__(self, num_classes):
         super().__init__()
 
-        self.down1 = UNetDown(num_channels, 64)
+        self.down1 = UNetDown(3, 64)
         self.down2 = UNetDown(64, 128)
         self.down3 = UNetDown(128, 256)
         self.down4 = UNetDown(256, 512, dropout=True)
@@ -225,10 +218,10 @@ class SegNet1Down(nn.Module):
 
 class SegNet1(nn.Module):
 
-    def __init__(self, num_channels, num_classes):
+    def __init__(self, num_classes):
         super().__init__()
 
-        self.down1 = SegNet1Down(num_channels, 64)
+        self.down1 = SegNet1Down(3, 64)
         self.down2 = SegNet1Down(64, 64)
         self.down3 = SegNet1Down(64, 64)
         self.down4 = SegNet1Down(64, 64)
@@ -304,10 +297,10 @@ class SegNet2Down(nn.Module):
 
 class SegNet2(nn.Module):
 
-    def __init__(self, num_channels, num_classes):
+    def __init__(self, num_classes):
         super().__init__()
 
-        self.down1 = SegNet2Down(num_channels, 64, layers=1)
+        self.down1 = SegNet2Down(3, 64, layers=1)
         self.down2 = SegNet2Down(64, 128, layers=1)
         self.down3 = SegNet2Down(128, 256, layers=2)
         self.down4 = SegNet2Down(256, 512, layers=2)
@@ -388,11 +381,11 @@ class PSPCross(nn.Module):
 
 class PSPNet(nn.Module):
 
-    def __init__(self, num_channels, num_classes):
+    def __init__(self, num_classes):
         super().__init__()
 
         self.layer1 = nn.Sequential(
-            nn.Conv2d(num_channels, 64, 3, stride=2, padding=1, bias=False),
+            nn.Conv2d(3, 64, 3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(64, momentum=.95),
             nn.ReLU(inplace=True),
             nn.Conv2d(64, 64, 3, stride=1, padding=1, bias=False),

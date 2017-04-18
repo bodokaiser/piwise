@@ -5,7 +5,7 @@ from PIL import Image
 from argparse import ArgumentParser
 
 from torch.nn import DataParallel
-from torch.optim import Adam
+from torch.optim import SGD
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, CenterCrop, ToTensor, ToPILImage
@@ -40,7 +40,7 @@ def train(args, model):
     loader = DataLoader(VOC12(args.datadir, input_transform, target_transform),
         num_workers=args.num_workers, batch_size=args.batch_size)
 
-    optimizer = Adam(model.parameters())
+    optimizer = SGD(model.parameters(), lr=.0001, momentum=.9, weight_decay=.04)
     criterion = CrossEntropyLoss2d()
 
     for epoch in range(1, args.num_epochs+1):
@@ -72,7 +72,7 @@ def train(args, model):
                 average = sum(epoch_loss) / len(epoch_loss)
                 print(f'loss: {average} (epoch: {epoch}, step: {step})')
             if args.steps_save > 0 and step % args.steps_save == 0:
-                filename = f'{args.model}-{epoch:03}-{step:04}.ckpt'
+                filename = f'{args.model}-{epoch:03}-{step:04}.pth'
                 torch.save(model.state_dict(), filename)
                 print(f'save: {filename} (epoch: {epoch}, step: {step})')
 
@@ -108,7 +108,7 @@ def main(args):
         Net = SegNet2
     assert Net is not None, f'model {args.model} not available'
 
-    model = Net(NUM_CHANNELS, NUM_CLASSES)
+    model = Net(NUM_CLASSES)
 
     if args.cuda:
         model = DataParallel(model).cuda()

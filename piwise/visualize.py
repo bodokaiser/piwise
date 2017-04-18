@@ -19,6 +19,6 @@ class Dashboard:
             image = image.cpu()
         if isinstance(image, Variable):
             image = image.data
-        image = image.numpy().transpose((1, 2, 0))
+        image = image.numpy()
 
         self.vis.image(image, env='images', opts=dict(title=title))

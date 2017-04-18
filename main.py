@@ -4,7 +4,6 @@ import torch
 from PIL import Image
 from argparse import ArgumentParser
 
-from torch.nn import DataParallel
 from torch.optim import SGD, Adam
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
@@ -23,18 +22,18 @@ NUM_CLASSES = 22
 color_transform = Colorize()
 image_transform = ToPILImage()
 input_transform = Compose([
-    CenterCrop(256),
+    CenterCrop(300),
     ToTensor(),
     Normalize([.485, .456, .406], [.229, .224, .225]),
 ])
 target_transform = Compose([
-    CenterCrop(256),
+    CenterCrop(300),
     ToLabel(),
     Relabel(255, 21),
 ])
 
 def train(args, model):
-    model.train(True)
+    model.train()
 
     loader = DataLoader(VOC12(args.datadir, input_transform, target_transform),
         num_workers=args.num_workers, batch_size=args.batch_size, shuffle=True)
@@ -47,9 +46,6 @@ def train(args, model):
         optimizer = SGD(model.parameters(), 1e-2, .9, 1e-4)
     if args.model.startswith('Seg'):
         optimizer = SGD(model.parameters(), 1e-3, .9)
-
-    if args.cuda:
-        criterion = criterion.cuda()
 
     if args.steps_plot > 0:
         board = Dashboard(args.port)
@@ -96,7 +92,7 @@ def train(args, model):
         print(f'loss: {sum(epoch_loss)} (epoch: {epoch})')
 
 def evaluate(args, model):
-    model.train(False)
+    model.eval()
 
     image = input_transform(Image.open(args.image))
     label = color_transform(model(Variable(image).unsqueeze(0))[0].data.max(0)[1])
@@ -126,7 +122,7 @@ def main(args):
     model = Net(NUM_CLASSES)
 
     if args.cuda:
-        model = DataParallel(model).cuda()
+        model = model.cuda()
     if args.state:
         model.load_state_dict(torch.load(args.state))
 
@@ -156,6 +152,6 @@ if __name__ == '__main__':
     parser_train.add_argument('--batch-size', type=int, default=1)
     parser_train.add_argument('--steps-loss', type=int, default=50)
     parser_train.add_argument('--steps-plot', type=int, default=0)
-    parser_train.add_argument('--steps-save', type=int, default=100)
+    parser_train.add_argument('--steps-save', type=int, default=500)
 
     main(parser.parse_args())

@@ -5,15 +5,14 @@ import torch.nn.functional as F
 
 from torchvision import models
 
-class FCN(nn.Module):
+class FCN8(nn.Module):
 
     def __init__(self, num_classes):
         super().__init__()
 
-        feat = list(models.vgg16(pretrained=True).features.children())
+        feats = list(models.vgg16(pretrained=True).features.children())
 
-        self.feat1 = nn.Sequential(*feat[0:4])
-        self.feat2 = nn.Sequential(*feat[5:9])
+        self.feats = nn.Sequential(*feat[0:9])
         self.feat3 = nn.Sequential(*feat[10:16])
         self.feat4 = nn.Sequential(*feat[17:23])
         self.feat5 = nn.Sequential(*feat[24:30])
@@ -25,26 +24,13 @@ class FCN(nn.Module):
             nn.ReLU(inplace=True),
             nn.Dropout(),
         )
+        self.score_feat3 = nn.Conv2d(256, num_classes, 1)
+        self.score_feat4 = nn.Conv2d(512, num_classes, 1)
         self.score_fconn = nn.Conv2d(4096, num_classes, 1)
 
     def forward(self, x):
-        x = self.feat1(x)
-        x = self.feat2(x)
-        x = self.feat3(x)
-
-        return x
-
-
-class FCN8(FCN):
-
-    def __init__(self, num_classes):
-        super().__init__(num_classes)
-
-        self.score_feat3 = nn.Conv2d(256, num_classes, 1)
-        self.score_feat4 = nn.Conv2d(512, num_classes, 1)
-
-    def forward(self, x):
-        feat3 = super().forward(x)
+        feats = self.feats(x)
+        feat3 = self.feat3(feats)
         feat4 = self.feat4(feat3)
         feat5 = self.feat5(feat4)
         fconn = self.fconn(feat5)
@@ -60,16 +46,30 @@ class FCN8(FCN):
 
         return F.upsample_bilinear(score, x.size()[2:])
 
-class FCN16(FCN):
+
+class FCN16(nn.Module):
 
     def __init__(self, num_classes):
-        super().__init__(num_classes)
+        super().__init__()
 
+        feats = list(models.vgg16(pretrained=True).features.children())
+        self.feats = nn.Sequential(*feats[0:16])
+        self.feat4 = nn.Sequential(*feats[17:23])
+        self.feat5 = nn.Sequential(*feats[24:30])
+        self.fconn = nn.Sequential(
+            nn.Conv2d(512, 4096, 7),
+            nn.ReLU(inplace=True),
+            nn.Dropout(),
+            nn.Conv2d(4096, 4096, 1),
+            nn.ReLU(inplace=True),
+            nn.Dropout(),
+        )
+        self.score_fconn = nn.Conv2d(4096, num_classes, 1)
         self.score_feat4 = nn.Conv2d(512, num_classes, 1)
 
     def forward(self, x):
-        feat3 = super().forward(x)
-        feat4 = self.feat4(feat3)
+        feats = self.feats(x)
+        feat4 = self.feat4(feats)
         feat5 = self.feat5(feat4)
         fconn = self.fconn(feat5)
 
@@ -82,15 +82,26 @@ class FCN16(FCN):
         return F.upsample_bilinear(score, x.size()[2:])
 
 
-class FCN32(FCN):
+class FCN32(nn.Module):
+
+    def __init__(self, num_classes):
+        super().__init__()
+
+        self.feats = models.vgg16(pretrained=True).features
+        self.fconn = nn.Sequential(
+            nn.Conv2d(512, 4096, 7),
+            nn.ReLU(inplace=True),
+            nn.Dropout(),
+            nn.Conv2d(4096, 4096, 1),
+            nn.ReLU(inplace=True),
+            nn.Dropout(),
+        )
+        self.score = nn.Conv2d(4096, num_classes, 1)
 
     def forward(self, x):
-        feat3 = super().forward(x)
-        feat4 = self.feat4(feat3)
-        feat5 = self.feat5(feat4)
-        fconn = self.fconn(feat5)
-
-        score = self.score_fconn(fconn)
+        feats = self.feats(x)
+        fconn = self.fconn(feats)
+        score = self.score(fconn)
 
         return F.upsample_bilinear(score, x.size()[2:])
 
@@ -350,6 +361,7 @@ class PSPNet(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
 
+        '''
         self.conv1 = nn.Sequential(
             nn.Conv2d(3, 64, 3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(64, momentum=.95),
@@ -362,13 +374,22 @@ class PSPNet(nn.Module):
             nn.ReLU(inplace=True),
             nn.MaxPool2d(3, stride=2, padding=1),
         )
+        '''
 
         resnet = models.resnet101(pretrained=True)
 
+        self.conv1 = resnet.conv1
         self.layer1 = resnet.layer1
         self.layer2 = resnet.layer2
         self.layer3 = resnet.layer3
         self.layer4 = resnet.layer4
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                m.stride = 1
+                m.requires_grad = False
+            if isinstance(m, nn.BatchNorm2d):
+                m.requires_grad = False
 
         self.layer5a = PSPDec(2048, 512, 60)
         self.layer5b = PSPDec(2048, 512, 30)
@@ -384,17 +405,24 @@ class PSPNet(nn.Module):
         )
 
     def forward(self, x):
+        print('x', x.size())
         x = self.conv1(x)
+        print('conv1', x.size())
         x = self.layer1(x)
+        print('layer1', x.size())
         x = self.layer2(x)
+        print('layer2', x.size())
         x = self.layer3(x)
+        print('layer3', x.size())
         x = self.layer4(x)
-        x = self.layer5(x)
+        print('layer4', x.size())
         x = self.final(torch.cat([
+            x,
             self.layer5a(x),
             self.layer5b(x),
             self.layer5c(x),
             self.layer5d(x),
         ], 1))
+        print('final', x.size())
 
         return F.upsample_bilinear(final, x.size()[2:])

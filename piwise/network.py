@@ -4,9 +4,19 @@ import torch.nn.init as init
 import torch.nn.functional as F
 
 from torchvision import models
-from torchvision.transforms import Normalize
+
+def vgg_normalize(images):
+    images[:, 0] -= .485
+    images[:, 0] /= .229
+    images[:, 1] -= .456
+    images[:, 1] /= .224
+    images[:, 2] -= .406
+    images[:, 2] /= .225
 
 class FCN(nn.Module):
+
+    MEAN = [.485, .456, .406]
+    STD = [.229, .224, .225]
 
     def __init__(self, num_classes):
         super().__init__()
@@ -27,11 +37,13 @@ class FCN(nn.Module):
             nn.Dropout(),
         )
         self.score_fconn = nn.Conv2d(4096, num_classes, 1)
-        self.normalize = Normalize([.485, .456, .406], [.229, .224, .225])
 
+    def normalize(self, x):
+        for i in range(3):
+            x[:, i] = (x[:, i] - self.MEAN[i]) / self.STD[i]
 
     def forward(self, x):
-        x = self.normalize(x)
+        self.normalize(x)
         x = self.feat1(x)
         x = self.feat2(x)
         x = self.feat3(x)

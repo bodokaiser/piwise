@@ -34,14 +34,23 @@ target_transform = Compose([
 def train(args, model):
     model.train(True)
 
+    loader = DataLoader(VOC12(args.datadir, input_transform, target_transform),
+        num_workers=args.num_workers, batch_size=args.batch_size, shuffle=True)
+    criterion = CrossEntropyLoss2d()
+
+    optimizer = Adam(model.parameters())
+    if args.model.startswith('FCN'):
+        optimizer = SGD(model.parameters(), 1e-4, .9, 2e-5)
+    if args.model.startswith('PSP'):
+        optimizer = SGD(model.parameters(), 1e-2, .9, 1e-4)
+    if args.model.startswith('Seg'):
+        optimizer = SGD(model.parameters(), 1e-3, .9)
+
+    if args.cuda:
+        criterion = criterion.cuda()
+
     if args.steps_plot > 0:
         board = Dashboard(args.port)
-
-    loader = DataLoader(VOC12(args.datadir, input_transform, target_transform),
-        num_workers=args.num_workers, batch_size=args.batch_size)
-
-    optimizer = SGD(model.parameters(), lr=.0001, momentum=.9, weight_decay=.04)
-    criterion = CrossEntropyLoss2d()
 
     for epoch in range(1, args.num_epochs+1):
         epoch_loss = []

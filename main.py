@@ -5,10 +5,11 @@ from PIL import Image
 from argparse import ArgumentParser
 
 from torch.nn import DataParallel
-from torch.optim import SGD
+from torch.optim import SGD, Adam
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
-from torchvision.transforms import Compose, CenterCrop, ToTensor, ToPILImage
+from torchvision.transforms import Compose, CenterCrop, Normalize
+from torchvision.transforms import ToTensor, ToPILImage
 
 from piwise.dataset import VOC12
 from piwise.network import FCN8, FCN16, FCN32, UNet, PSPNet, SegNet1, SegNet2
@@ -24,6 +25,7 @@ image_transform = ToPILImage()
 input_transform = Compose([
     CenterCrop(256),
     ToTensor(),
+    Normalize([.485, .456, .406], [.229, .224, .225]),
 ])
 target_transform = Compose([
     CenterCrop(256),
@@ -71,7 +73,11 @@ def train(args, model):
 
             epoch_loss.append(loss.data[0])
             if args.steps_plot > 0 and step % args.steps_plot == 0:
-                board.image(inputs[0].cpu().data,
+                image = inputs[0].cpu().data
+                image[0] = image[0] * .229 + .485
+                image[1] = image[1] * .224 + .456
+                image[2] = image[2] * .225 + .406
+                board.image(image,
                     f'input (epoch: {epoch}, step: {step})')
                 board.image(color_transform(outputs[0].cpu().max(0)[1].data),
                     f'output (epoch: {epoch}, step: {step})')

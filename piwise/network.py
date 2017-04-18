@@ -5,18 +5,7 @@ import torch.nn.functional as F
 
 from torchvision import models
 
-def vgg_normalize(images):
-    images[:, 0] -= .485
-    images[:, 0] /= .229
-    images[:, 1] -= .456
-    images[:, 1] /= .224
-    images[:, 2] -= .406
-    images[:, 2] /= .225
-
 class FCN(nn.Module):
-
-    MEAN = [.485, .456, .406]
-    STD = [.229, .224, .225]
 
     def __init__(self, num_classes):
         super().__init__()
@@ -38,12 +27,7 @@ class FCN(nn.Module):
         )
         self.score_fconn = nn.Conv2d(4096, num_classes, 1)
 
-    def normalize(self, x):
-        for i in range(3):
-            x[:, i] = (x[:, i] - self.MEAN[i]) / self.STD[i]
-
     def forward(self, x):
-        self.normalize(x)
         x = self.feat1(x)
         x = self.feat2(x)
         x = self.feat3(x)
@@ -344,12 +328,12 @@ class SegNet2(nn.Module):
         return self.final(up1)
 
 
-class PSPPool(nn.Module):
+class PSPDec(nn.Module):
 
     def __init__(self, in_features, out_features, downsize, upsize=60):
         super().__init__()
 
-        self.pool = nn.Sequential(
+        self.features = nn.Sequential(
             nn.AvgPool2d(downsize, stride=downsize),
             nn.Conv2d(in_features, out_features, 1, bias=False),
             nn.BatchNorm2d(out_features, momentum=.95),
@@ -358,7 +342,7 @@ class PSPPool(nn.Module):
         )
 
     def forward(self, x):
-        return self.pool(x)
+        return self.features(x)
 
 
 class PSPNet(nn.Module):
@@ -386,10 +370,10 @@ class PSPNet(nn.Module):
         self.layer3 = resnet.layer3
         self.layer4 = resnet.layer4
 
-        self.layer5a = PSPPool(2048, 512, 60)
-        self.layer5b = PSPPool(2048, 512, 30)
-        self.layer5c = PSPPool(2048, 512, 20)
-        self.layer5d = PSPPool(2048, 512, 10)
+        self.layer5a = PSPDec(2048, 512, 60)
+        self.layer5b = PSPDec(2048, 512, 30)
+        self.layer5c = PSPDec(2048, 512, 20)
+        self.layer5d = PSPDec(2048, 512, 10)
 
         self.final = nn.Sequential(
             nn.Conv2d(2048, 512, 3, padding=1, bias=False),

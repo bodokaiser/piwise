@@ -111,7 +111,7 @@ class FCN32(nn.Module):
         return F.upsample_bilinear(score, x.size()[2:])
 
 
-class UNetUp(nn.Module):
+class UNetEnc(nn.Module):
 
     def __init__(self, in_channels, features, out_channels):
         super().__init__()
@@ -129,7 +129,7 @@ class UNetUp(nn.Module):
         return self.up(x)
 
 
-class UNetDown(nn.Module):
+class UNetDec(nn.Module):
 
     def __init__(self, in_channels, out_channels, dropout=False):
         super().__init__()
@@ -155,10 +155,10 @@ class UNet(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
 
-        self.down1 = UNetDown(3, 64)
-        self.down2 = UNetDown(64, 128)
-        self.down3 = UNetDown(128, 256)
-        self.down4 = UNetDown(256, 512, dropout=True)
+        self.dec1 = UNetDec(3, 64)
+        self.dec2 = UNetDec(64, 128)
+        self.dec3 = UNetDec(128, 256)
+        self.dec4 = UNetDec(256, 512, dropout=True)
         self.center = nn.Sequential(
             nn.Conv2d(512, 1024, 3),
             nn.ReLU(inplace=True),
@@ -168,10 +168,10 @@ class UNet(nn.Module):
             nn.ConvTranspose2d(1024, 512, 2, stride=2),
             nn.ReLU(inplace=True),
         )
-        self.up4 = UNetUp(1024, 512, 256)
-        self.up3 = UNetUp(512, 256, 128)
-        self.up2 = UNetUp(256, 128, 64)
-        self.up1 = nn.Sequential(
+        self.enc4 = UNetEnc(1024, 512, 256)
+        self.enc3 = UNetEnc(512, 256, 128)
+        self.enc2 = UNetEnc(256, 128, 64)
+        self.enc1 = nn.Sequential(
             nn.Conv2d(128, 64, 3),
             nn.ReLU(inplace=True),
             nn.Conv2d(64, 64, 3),
@@ -180,21 +180,21 @@ class UNet(nn.Module):
         self.final = nn.Conv2d(64, num_classes, 1)
 
     def forward(self, x):
-        down1 = self.down1(x)
-        down2 = self.down2(down1)
-        down3 = self.down3(down2)
-        down4 = self.down4(down3)
-        center = self.center(down4)
-        up4 = self.up4(torch.cat([
-            center, F.upsample_bilinear(down4, center.size()[2:])], 1))
-        up3 = self.up3(torch.cat([
-            up4, F.upsample_bilinear(down3, up4.size()[2:])], 1))
-        up2 = self.up2(torch.cat([
-            up3, F.upsample_bilinear(down2, up3.size()[2:])], 1))
-        up1 = self.up1(torch.cat([
-            up2, F.upsample_bilinear(down1, up2.size()[2:])], 1))
+        dec1 = self.dec1(x)
+        dec2 = self.dec2(dec1)
+        dec3 = self.dec3(dec2)
+        dec4 = self.dec4(dec3)
+        center = self.center(dec4)
+        enc4 = self.enc4(torch.cat([
+            center, F.upsample_bilinear(dec4, center.size()[2:])], 1))
+        enc3 = self.up3(torch.cat([
+            enc4, F.upsample_bilinear(dec3, enc4.size()[2:])], 1))
+        enc2 = self.up2(torch.cat([
+            enc3, F.upsample_bilinear(dec2, enc3.size()[2:])], 1))
+        enc1 = self.up1(torch.cat([
+            enc2, F.upsample_bilinear(dec1, enc2.size()[2:])], 1))
 
-        return F.upsample_bilinear(self.final(up1), x.size()[2:])
+        return F.upsample_bilinear(self.final(enc1), x.size()[2:])
 
 
 class SegNetDec(nn.Module):

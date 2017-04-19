@@ -12,10 +12,15 @@ class FCN8(nn.Module):
 
         feats = list(models.vgg16(pretrained=True).features.children())
 
-        self.feats = nn.Sequential(*feat[0:9])
-        self.feat3 = nn.Sequential(*feat[10:16])
-        self.feat4 = nn.Sequential(*feat[17:23])
-        self.feat5 = nn.Sequential(*feat[24:30])
+        self.feats = nn.Sequential(*feats[0:9])
+        self.feat3 = nn.Sequential(*feats[10:16])
+        self.feat4 = nn.Sequential(*feats[17:23])
+        self.feat5 = nn.Sequential(*feats[24:30])
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                m.requires_grad = False
+
         self.fconn = nn.Sequential(
             nn.Conv2d(512, 4096, 7),
             nn.ReLU(inplace=True),

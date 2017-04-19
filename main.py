@@ -87,10 +87,6 @@ def train(args, model):
                 torch.save(model.state_dict(), filename)
                 print(f'save: {filename} (epoch: {epoch}, step: {step})')
 
-        if args.steps_plot > 0:
-            board.loss(epoch_loss, 'training loss')
-        print(f'loss: {sum(epoch_loss)} (epoch: {epoch})')
-
 def evaluate(args, model):
     model.eval()
 

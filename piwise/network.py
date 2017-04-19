@@ -197,93 +197,7 @@ class UNet(nn.Module):
         return F.upsample_bilinear(self.final(up1), x.size()[2:])
 
 
-class SegNet1Up(nn.Module):
-
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-
-        self.up = nn.Sequential(
-            nn.UpsamplingBilinear2d(scale_factor=2),
-            nn.Conv2d(in_channels, out_channels, 7, padding=3),
-            nn.BatchNorm2d(out_channels),
-        )
-
-    def forward(self, x):
-        return self.up(x)
-
-
-class SegNet1Down(nn.Module):
-
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-
-        self.down = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, 7, padding=3),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2, stride=2, ceil_mode=True),
-        )
-
-    def forward(self, x):
-        return self.down(x)
-
-
-class SegNet1(nn.Module):
-
-    def __init__(self, num_classes):
-        super().__init__()
-
-        self.down1 = SegNet1Down(3, 64)
-        self.down2 = SegNet1Down(64, 64)
-        self.down3 = SegNet1Down(64, 64)
-        self.down4 = SegNet1Down(64, 64)
-        self.up4 = SegNet1Up(64, 64)
-        self.up3 = SegNet1Up(128, 64)
-        self.up2 = SegNet1Up(128, 64)
-        self.up1 = SegNet1Up(128, 64)
-        self.final = nn.Conv2d(64, num_classes, 1)
-
-    def forward(self, x):
-        down1 = self.down1(x)
-        down2 = self.down2(down1)
-        down3 = self.down3(down2)
-        down4 = self.down4(down3)
-        up4 = self.up4(down4)
-        up3 = self.up3(torch.cat([down3, up4], 1))
-        up2 = self.up2(torch.cat([down2, up3], 1))
-        up1 = self.up1(torch.cat([down1, up2], 1))
-
-        return self.final(up1)
-
-
-class SegNet2Up(nn.Module):
-
-    def __init__(self, in_channels, out_channels, layers):
-        super().__init__()
-
-        up = [
-            nn.UpsamplingBilinear2d(scale_factor=2),
-            nn.Conv2d(in_channels, in_channels // 2, 3, padding=1),
-            nn.BatchNorm2d(in_channels // 2),
-            nn.ReLU(inplace=True),
-        ]
-        up += [
-            nn.Conv2d(in_channels // 2, in_channels // 2, 3, padding=1),
-            nn.BatchNorm2d(in_channels // 2),
-            nn.ReLU(inplace=True),
-        ] * layers
-        up += [
-            nn.Conv2d(in_channels // 2, out_channels, 3, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-        ]
-        self.up = nn.Sequential(*up)
-
-    def forward(self, x):
-        return self.up(x)
-
-
-class SegNet2Down(nn.Module):
+class SegNetDec(nn.Module):
 
     def __init__(self, in_channels, out_channels, layers):
         super().__init__()
@@ -307,21 +221,23 @@ class SegNet2Down(nn.Module):
         return self.down(x)
 
 
-class SegNet2(nn.Module):
+class SegNet(nn.Module):
 
     def __init__(self, num_classes):
         super().__init__()
 
-        self.down1 = SegNet2Down(3, 64, layers=1)
-        self.down2 = SegNet2Down(64, 128, layers=1)
-        self.down3 = SegNet2Down(128, 256, layers=2)
-        self.down4 = SegNet2Down(256, 512, layers=2)
-        self.down5 = SegNet2Down(512, 512, layers=2)
-        self.up5 = SegNet2Up(512, 512, layers=1)
-        self.up4 = SegNet2Up(1024, 256, layers=1)
-        self.up3 = SegNet2Up(512, 128, layers=1)
-        self.up2 = SegNet2Up(256, 64, layers=0)
-        self.up1 = nn.Sequential(
+        decoders = list(models.vgg16_bn(pretrained=True).features.children())
+
+        self.dec1 = nn.Sequential(*decoders[0:6])
+        self.dec2 = nn.Sequential(*decorders[7:13])
+        self.dec3 = nn.Sequential(*decorders[14:23])
+        self.dec4 = nn.Sequential(*decorders[24:33])
+        self.dec5 = nn.Sequential(*decorders[34:43])
+        self.enc5 = SegNetEnc(512, 512, layers=1)
+        self.enc4 = SegNetEnc(1024, 256, layers=1)
+        self.enc3 = SegNetEnc(512, 128, layers=1)
+        self.enc2 = SegNetEnc(256, 64, layers=0)
+        self.enc1 = nn.Sequential(
             nn.UpsamplingBilinear2d(scale_factor=2),
             nn.Conv2d(128, 64, 3, padding=1),
             nn.BatchNorm2d(64),
@@ -330,18 +246,18 @@ class SegNet2(nn.Module):
         self.final = nn.Conv2d(64, num_classes, 3, padding=1)
 
     def forward(self, x):
-        down1 = self.down1(x)
-        down2 = self.down2(down1)
-        down3 = self.down3(down2)
-        down4 = self.down4(down3)
-        down5 = self.down5(down4)
-        up5 = self.up5(down5)
-        up4 = self.up4(torch.cat([down4, up5], 1))
-        up3 = self.up3(torch.cat([down3, up4], 1))
-        up2 = self.up2(torch.cat([down2, up3], 1))
-        up1 = self.up1(torch.cat([down1, up2], 1))
+        dec1 = self.dec1(x)
+        dec2 = self.dec2(dec1)
+        dec3 = self.dec3(dec2)
+        dec4 = self.dec4(dec3)
+        dec5 = self.dec5(dec4)
+        enc5 = self.enc5(enc5)
+        enc4 = self.enc4(torch.cat([dec4, enc5], 1))
+        enc3 = self.enc3(torch.cat([dec3, enc4], 1))
+        enc2 = self.enc2(torch.cat([dec2, enc3], 1))
+        enc1 = self.enc1(torch.cat([dec1, enc2], 1))
 
-        return self.final(up1)
+        return F.upsample_bilinear(self.final(up1), x.size()[2:])
 
 
 class PSPDec(nn.Module):

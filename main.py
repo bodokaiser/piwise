@@ -11,7 +11,7 @@ from torchvision.transforms import Compose, CenterCrop, Normalize
 from torchvision.transforms import ToTensor, ToPILImage
 
 from piwise.dataset import VOC12
-from piwise.network import FCN8, FCN16, FCN32, UNet, PSPNet, SegNet1, SegNet2
+from piwise.network import FCN8, FCN16, FCN32, UNet, PSPNet, SegNet
 from piwise.criterion import CrossEntropyLoss2d
 from piwise.transform import Relabel, ToLabel, Colorize
 from piwise.visualize import Dashboard
@@ -109,10 +109,8 @@ def main(args):
         Net = UNet
     if args.model == 'pspnet':
         Net = PSPNet
-    if args.model == 'segnet1':
-        Net = SegNet1
-    if args.model == 'segnet2':
-        Net = SegNet2
+    if args.model == 'segnet':
+        Net = SegNet
     assert Net is not None, f'model {args.model} not available'
 
     model = Net(NUM_CLASSES)

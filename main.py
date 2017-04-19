@@ -22,12 +22,12 @@ NUM_CLASSES = 22
 color_transform = Colorize()
 image_transform = ToPILImage()
 input_transform = Compose([
-    CenterCrop(300),
+    CenterCrop(256),
     ToTensor(),
     Normalize([.485, .456, .406], [.229, .224, .225]),
 ])
 target_transform = Compose([
-    CenterCrop(300),
+    CenterCrop(256),
     ToLabel(),
     Relabel(255, 21),
 ])

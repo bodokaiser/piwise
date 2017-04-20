@@ -91,7 +91,8 @@ def evaluate(args, model):
     model.eval()
 
     image = input_transform(Image.open(args.image))
-    label = color_transform(model(Variable(image).unsqueeze(0))[0].data.max(0)[1])
+    label = model(Variable(image, volatile=True).unsqueeze(0))
+    label = color_transform(label[0].data.max(0)[1])
 
     image_transform(label).save(args.label)
 
@@ -118,7 +119,11 @@ def main(args):
     if args.cuda:
         model = model.cuda()
     if args.state:
-        model.load_state_dict(torch.load(args.state))
+        try:
+            model.load_state_dict(torch.load(args.state))
+        except AssertionError:
+            model.load_state_dict(torch.load(args.state,
+                map_location=lambda storage, loc: storage))
 
     if args.mode == 'eval':
         evaluate(args, model)

@@ -230,7 +230,7 @@ class SegNet(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
 
-        # this should be vgg16bn however there are no pretrained weights here
+        # should be vgg16bn but at the moment we have no pretrained bn models
         decoders = list(models.vgg16(pretrained=True).features.children())
 
         self.dec1 = nn.Sequential(*decoders[:5])
@@ -238,6 +238,12 @@ class SegNet(nn.Module):
         self.dec3 = nn.Sequential(*decoders[10:17])
         self.dec4 = nn.Sequential(*decoders[17:24])
         self.dec5 = nn.Sequential(*decoders[24:])
+
+        # gives better results
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                m.requires_grad = False
+
         self.enc5 = SegNetEnc(512, 512, 1)
         self.enc4 = SegNetEnc(1024, 256, 1)
         self.enc3 = SegNetEnc(512, 128, 1)

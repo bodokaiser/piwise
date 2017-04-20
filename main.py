@@ -35,9 +35,16 @@ target_transform = Compose([
 def train(args, model):
     model.train()
 
+    weight = torch.ones(22)
+    weight[0] = 0
+
     loader = DataLoader(VOC12(args.datadir, input_transform, target_transform),
         num_workers=args.num_workers, batch_size=args.batch_size, shuffle=True)
-    criterion = CrossEntropyLoss2d()
+
+    if args.cuda:
+        criterion = CrossEntropyLoss2d(weight.cuda())
+    else:
+        criterion = CrossEntropyLoss2d(weight)
 
     optimizer = Adam(model.parameters())
     if args.model.startswith('FCN'):

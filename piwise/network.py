@@ -188,11 +188,11 @@ class UNet(nn.Module):
         center = self.center(dec4)
         enc4 = self.enc4(torch.cat([
             center, F.upsample_bilinear(dec4, center.size()[2:])], 1))
-        enc3 = self.up3(torch.cat([
+        enc3 = self.enc3(torch.cat([
             enc4, F.upsample_bilinear(dec3, enc4.size()[2:])], 1))
-        enc2 = self.up2(torch.cat([
+        enc2 = self.enc2(torch.cat([
             enc3, F.upsample_bilinear(dec2, enc3.size()[2:])], 1))
-        enc1 = self.up1(torch.cat([
+        enc1 = self.enc1(torch.cat([
             enc2, F.upsample_bilinear(dec1, enc2.size()[2:])], 1))
 
         return F.upsample_bilinear(self.final(enc1), x.size()[2:])

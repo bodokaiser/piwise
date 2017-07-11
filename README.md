@@ -9,6 +9,8 @@ Pixel-wise segmentation on the [VOC2012][dataset] dataset using
 - [x] [UNet](https://arxiv.org/abs/1505.04597)
 - [ ] [RefineNet](https://arxiv.org/abs/1611.06612)
 
+For a more complete implementation of segmentation networks checkout [semseg](https://github.com/meetshah1995/pytorch-semseg).
+
 Note:
 
 - FCN differs from original implementation see [this issue](https://github.com/bodokaiser/piwise/issues/4)

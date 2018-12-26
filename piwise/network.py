@@ -202,18 +202,16 @@ class SegNetEnc(nn.Module):
 
     def __init__(self, in_channels, out_channels, num_layers):
         super().__init__()
-
         layers = [
-            nn.UpsamplingBilinear2d(scale_factor=2),
             nn.Conv2d(in_channels, in_channels // 2, 3, padding=1),
             nn.BatchNorm2d(in_channels // 2),
             nn.ReLU(inplace=True),
         ]
         layers += [
-            nn.Conv2d(in_channels // 2, in_channels // 2, 3, padding=1),
-            nn.BatchNorm2d(in_channels // 2),
-            nn.ReLU(inplace=True),
-        ] * num_layers
+                      nn.Conv2d(in_channels // 2, in_channels // 2, 3, padding=1),
+                      nn.BatchNorm2d(in_channels // 2),
+                      nn.ReLU(inplace=True),
+                  ] * num_layers
         layers += [
             nn.Conv2d(in_channels // 2, out_channels, 3, padding=1),
             nn.BatchNorm2d(out_channels),
@@ -227,48 +225,55 @@ class SegNetEnc(nn.Module):
 
 class SegNet(nn.Module):
 
-    def __init__(self, num_classes):
+    def __init__(self, classes):
         super().__init__()
+        vgg16 = models.vgg16(pretrained=True)
+        features = vgg16.features
+        self.dec1 = features[0: 4]
+        self.dec2 = features[5: 9]
+        self.dec3 = features[10: 16]
+        self.dec4 = features[17: 23]
+        self.dec5 = features[24: -1]
 
-        # should be vgg16bn but at the moment we have no pretrained bn models
-        decoders = list(models.vgg16(pretrained=True).features.children())
-
-        self.dec1 = nn.Sequential(*decoders[:5])
-        self.dec2 = nn.Sequential(*decoders[5:10])
-        self.dec3 = nn.Sequential(*decoders[10:17])
-        self.dec4 = nn.Sequential(*decoders[17:24])
-        self.dec5 = nn.Sequential(*decoders[24:])
-
-        # gives better results
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 m.requires_grad = False
 
         self.enc5 = SegNetEnc(512, 512, 1)
-        self.enc4 = SegNetEnc(1024, 256, 1)
-        self.enc3 = SegNetEnc(512, 128, 1)
-        self.enc2 = SegNetEnc(256, 64, 0)
-        self.enc1 = nn.Sequential(
-            nn.UpsamplingBilinear2d(scale_factor=2),
-            nn.Conv2d(128, 64, 3, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-        )
-        self.final = nn.Conv2d(64, num_classes, 3, padding=1)
+        self.enc4 = SegNetEnc(512, 256, 1)
+        self.enc3 = SegNetEnc(256, 128, 1)
+        self.enc2 = SegNetEnc(128, 64, 0)
+
+        self.final = nn.Sequential(*[
+            nn.Conv2d(64, classes, 3, padding=1),
+            nn.BatchNorm2d(classes),
+            nn.ReLU(inplace=True)
+        ])
 
     def forward(self, x):
-        dec1 = self.dec1(x)
-        dec2 = self.dec2(dec1)
-        dec3 = self.dec3(dec2)
-        dec4 = self.dec4(dec3)
-        dec5 = self.dec5(dec4)
-        enc5 = self.enc5(dec5)
-        enc4 = self.enc4(torch.cat([dec4, enc5], 1))
-        enc3 = self.enc3(torch.cat([dec3, enc4], 1))
-        enc2 = self.enc2(torch.cat([dec2, enc3], 1))
-        enc1 = self.enc1(torch.cat([dec1, enc2], 1))
+        x1 = self.dec1(x)
+        d1, m1 = F.max_pool2d(x1, kernel_size=2, stride=2, return_indices=True)
+        x2 = self.dec2(d1)
+        d2, m2 = F.max_pool2d(x2, kernel_size=2, stride=2, return_indices=True)
+        x3 = self.dec3(d2)
+        d3, m3 = F.max_pool2d(x3, kernel_size=2, stride=2, return_indices=True)
+        x4 = self.dec4(d3)
+        d4, m4 = F.max_pool2d(x4, kernel_size=2, stride=2, return_indices=True)
+        x5 = self.dec5(d4)
+        d5, m5 = F.max_pool2d(x5, kernel_size=2, stride=2, return_indices=True)
 
-        return F.upsample_bilinear(self.final(enc1), x.size()[2:])
+        def upsample(d):
+            e5 = self.enc5(F.max_unpool2d(d, m5, kernel_size=2, stride=2, output_size=x5.size()))
+            e4 = self.enc4(F.max_unpool2d(e5, m4, kernel_size=2, stride=2, output_size=x4.size()))
+            e3 = self.enc3(F.max_unpool2d(e4, m3, kernel_size=2, stride=2, output_size=x3.size()))
+            e2 = self.enc2(F.max_unpool2d(e3, m2, kernel_size=2, stride=2, output_size=x2.size()))
+            e1 = F.max_unpool2d(e2, m1, kernel_size=2, stride=2, output_size=x1.size())
+            return e1
+
+        e = upsample(d5)
+
+        return self.final(e)
+
 
 
 class PSPDec(nn.Module):

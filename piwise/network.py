@@ -208,10 +208,10 @@ class SegNetEnc(nn.Module):
             nn.ReLU(inplace=True),
         ]
         layers += [
-                      nn.Conv2d(in_channels // 2, in_channels // 2, 3, padding=1),
-                      nn.BatchNorm2d(in_channels // 2),
-                      nn.ReLU(inplace=True),
-                  ] * num_layers
+            nn.Conv2d(in_channels // 2, in_channels // 2, 3, padding=1),
+            nn.BatchNorm2d(in_channels // 2),
+            nn.ReLU(inplace=True),
+        ] * num_layers
         layers += [
             nn.Conv2d(in_channels // 2, out_channels, 3, padding=1),
             nn.BatchNorm2d(out_channels),
